@@ -1,13 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../services/api_service.dart';
-import '../../theme/app_theme.dart';
-
 enum SplashResult {
   welcome,
-  login,
-  faceId,
-  app,
 }
 
 class SplashView extends StatefulWidget {
@@ -31,33 +25,20 @@ class _SplashViewState extends State<SplashView> {
 
   Future<void> _bootstrap() async {
     await Future.delayed(
-      const Duration(seconds: 2),
+      const Duration(seconds: 5),
     );
 
-    try {
-      if (ApiService.token == null) {
-        if (!mounted) return;
+    if (!mounted) return;
 
-        widget.onResolved(SplashResult.welcome);
-        return;
-      }
-
-      await ApiService.getMe();
-
-      if (!mounted) return;
-
-      widget.onResolved(SplashResult.app);
-    } catch (_) {
-      if (!mounted) return;
-
-      widget.onResolved(SplashResult.welcome);
-    }
+    widget.onResolved(SplashResult.welcome);
   }
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return Scaffold(
-      backgroundColor: AppTheme.primaryBlue,
+      backgroundColor: colors.secondary,
       body: Center(
         child: Image.asset(
           'assets/images/logo.png',

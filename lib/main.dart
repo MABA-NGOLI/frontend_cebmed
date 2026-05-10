@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'theme/app_theme.dart';
+import 'views/entry/splash_view.dart';
+
 void main() {
   runApp(const MyApp());
 }
@@ -10,11 +13,13 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      home: Scaffold(
-        appBar: AppBar(title: Text("CEBMED")),
-        body: Center(
-          child: Text("Flutter fonctionne !"),
-        ),
+      debugShowCheckedModeBanner: false,
+      title: 'CEBMED',
+      theme: AppTheme.light(),
+      home: SplashView(
+        onResolved: (result) {
+          print(result);
+        },
       ),
     );
   }

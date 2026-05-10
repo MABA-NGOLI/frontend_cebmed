@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'theme/app_theme.dart';
 import 'views/entry/splash_view.dart';
 import 'views/entry/welcome_view.dart';
+import 'views/main_shell.dart';
 
 enum EntryStage {
   splash,
   welcome,
+  app,
 }
 
 void main() {
@@ -30,7 +32,7 @@ class _CebMedAppState extends State<CebMedApp> {
     switch (stage) {
       case EntryStage.splash:
         home = SplashView(
-          onResolved: (result) {
+          onResolved: (_) {
             setState(() {
               stage = EntryStage.welcome;
             });
@@ -41,10 +43,24 @@ class _CebMedAppState extends State<CebMedApp> {
       case EntryStage.welcome:
         home = WelcomeView(
           onLogin: () {
-            debugPrint('Login clicked');
+            setState(() {
+              stage = EntryStage.app;
+            });
           },
           onSignup: () {
-            debugPrint('Signup clicked');
+            setState(() {
+              stage = EntryStage.app;
+            });
+          },
+        );
+        break;
+
+      case EntryStage.app:
+        home = MainShell(
+          onLogout: () {
+            setState(() {
+              stage = EntryStage.welcome;
+            });
           },
         );
         break;

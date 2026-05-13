@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 import 'theme/app_theme.dart';
 import 'views/entry/splash_view.dart';
@@ -11,7 +13,9 @@ enum EntryStage {
   app,
 }
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('fr_FR');
   runApp(const CebMedApp());
 }
 
@@ -70,6 +74,16 @@ class _CebMedAppState extends State<CebMedApp> {
       debugShowCheckedModeBanner: false,
       title: 'CebMed',
       theme: AppTheme.light(),
+      locale: const Locale('fr', 'FR'),
+      supportedLocales: const [
+        Locale('fr', 'FR'),
+        Locale('en', 'US'),
+      ],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       home: home,
     );
   }

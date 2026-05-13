@@ -1,8 +1,8 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import 'home/home_view.dart';
-import 'agenda/agenda_view.dart';
-import 'ordonnances/ordonnances_view.dart';
+import 'agenda/appointment_view.dart';
+import 'ordonnances/document_view.dart';
 import 'profile/profile_view.dart';
 
 class MainShell extends StatefulWidget {
@@ -22,8 +22,8 @@ class _MainShellState extends State<MainShell> {
 
   late final List<Widget> _pages = [
     const HomeView(),
-    const OrdonnancesView(),
-    const AgendaView(),
+    const DocumentView(),
+    const AppointmentView(),
     ProfileView(onLogout: widget.onLogout),
   ];
 

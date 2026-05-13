@@ -1,17 +1,32 @@
-import 'dart:convert';
+﻿import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import '../models/appointment.dart';
+import '../models/document_model.dart';
+
 class ApiService {
-  static const String baseUrl =
-      'http://10.0.2.2:3000/api';
+  static final String baseUrl = _resolveBaseUrl();
+
+  static String _resolveBaseUrl() {
+    if (kIsWeb) {
+      return 'http://localhost:3000/api';
+    }
+
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return 'http://10.0.2.2:3000/api';
+    }
+
+    return 'http://localhost:3000/api';
+  }
 
   static String? token;
 
   static Map<String, String> headers() {
     return {
       'Content-Type': 'application/json',
-      if (token != null)
-        'Authorization': 'Bearer $token',
+      ...?(token == null ? null : {'Authorization': 'Bearer $token'}),
     };
   }
 
@@ -34,7 +49,7 @@ class ApiService {
       }),
     );
 
-    return jsonDecode(response.body);
+    return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
   static Future<Map<String, dynamic>> login({
@@ -50,12 +65,8 @@ class ApiService {
       }),
     );
 
-    final data =
-    jsonDecode(response.body)
-    as Map<String, dynamic>;
-
-    token = data['token'];
-
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    token = data['token'] as String?;
     return data;
   }
 
@@ -65,6 +76,194 @@ class ApiService {
       headers: headers(),
     );
 
-    return jsonDecode(response.body);
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  static Future<List<Appointment>> getAppointments() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/appointments'),
+      headers: headers(),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Erreur chargement rendez-vous (HTTP ${response.statusCode}): ${response.body}',
+      );
+    }
+
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final List<dynamic> data = body['data'] as List<dynamic>;
+
+    return data.map((item) => Appointment.fromJson(item as Map<String, dynamic>)).toList();
+  }
+
+  static Future<Appointment> createAppointment({
+    required String title,
+    String? description,
+    String? location,
+    required DateTime startTime,
+    required DateTime endTime,
+    bool notificationsEnabled = false,
+    String? consultationType,
+    int? reminderDelay,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/appointments'),
+      headers: headers(),
+      body: jsonEncode({
+        'title': title,
+        'description': description,
+        'location': location,
+        'start_time': startTime.toIso8601String(),
+        'end_time': endTime.toIso8601String(),
+        'notifications_enabled': notificationsEnabled,
+        'consultation_type': consultationType,
+        'reminder_delay': reminderDelay,
+      }),
+    );
+
+    if (response.statusCode != 201) {
+      throw Exception(
+        'Erreur création rendez-vous (HTTP ${response.statusCode}): ${response.body}',
+      );
+    }
+
+    return Appointment.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  static Future<void> deleteAppointment(int id) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/appointments/$id'),
+      headers: headers(),
+    );
+
+    if (response.statusCode != 204) {
+      throw Exception(
+        'Erreur suppression rendez-vous (HTTP ${response.statusCode}): ${response.body}',
+      );
+    }
+  }
+
+  static Future<Appointment> updateAppointment({
+    required int id,
+    String? title,
+    String? description,
+    String? location,
+    DateTime? startTime,
+    DateTime? endTime,
+    bool? notificationsEnabled,
+    String? consultationType,
+    int? reminderDelay,
+  }) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/appointments/$id'),
+      headers: headers(),
+      body: jsonEncode({
+        'title': ?title,
+        'description': ?description,
+        'location': ?location,
+        'start_time': ?startTime?.toIso8601String(),
+        'end_time': ?endTime?.toIso8601String(),
+        'notifications_enabled': ?notificationsEnabled,
+        'consultation_type': ?consultationType,
+        'reminder_delay': ?reminderDelay,
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Erreur modification rendez-vous (HTTP ${response.statusCode}): ${response.body}',
+      );
+    }
+
+    return Appointment.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  static Future<List<DocumentModel>> getDocuments() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/documents'),
+      headers: headers(),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Erreur chargement documents (HTTP ${response.statusCode}): ${response.body}',
+      );
+    }
+
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final List<dynamic> data = body['data'] as List<dynamic>;
+
+    return data.map((item) => DocumentModel.fromJson(item as Map<String, dynamic>)).toList();
+  }
+
+  static Future<DocumentModel> createDocument({
+    required String name,
+    required String type,
+    String? description,
+    required String fileName,
+    required List<int> bytes,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/documents'),
+      headers: headers(),
+      body: jsonEncode({
+        'name': name,
+        'type': type,
+        'description': description,
+        'fileName': fileName,
+        'contentBase64': base64Encode(bytes),
+      }),
+    );
+
+    if (response.statusCode != 201) {
+      throw Exception(
+        'Erreur création document (HTTP ${response.statusCode}): ${response.body}',
+      );
+    }
+
+    return DocumentModel.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  static Future<DocumentModel> updateDocument({
+    required int id,
+    String? name,
+    String? type,
+    String? description,
+    String? fileName,
+    List<int>? bytes,
+  }) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/documents/$id'),
+      headers: headers(),
+      body: jsonEncode({
+        'name': ?name,
+        'type': ?type,
+        'description': ?description,
+        'fileName': ?fileName,
+        'contentBase64': ?(bytes == null ? null : base64Encode(bytes)),
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Erreur modification document (HTTP ${response.statusCode}): ${response.body}',
+      );
+    }
+
+    return DocumentModel.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  static Future<void> deleteDocument(int id) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/documents/$id'),
+      headers: headers(),
+    );
+
+    if (response.statusCode != 204) {
+      throw Exception(
+        'Erreur suppression document (HTTP ${response.statusCode}): ${response.body}',
+      );
+    }
   }
 }

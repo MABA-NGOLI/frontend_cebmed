@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 class WelcomeView extends StatelessWidget {
   const WelcomeView({
@@ -81,3 +81,4 @@ class WelcomeView extends StatelessWidget {
     );
   }
 }
+

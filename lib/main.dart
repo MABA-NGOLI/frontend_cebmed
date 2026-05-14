@@ -1,8 +1,11 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
+import 'package:frontend_cebmed/services/api_service.dart';
 import 'theme/app_theme.dart';
+import 'views/authentication/login_view.dart';
+import 'views/authentication/signup_view.dart';
 import 'views/entry/splash_view.dart';
 import 'views/entry/welcome_view.dart';
 import 'views/main_shell.dart';
@@ -10,6 +13,8 @@ import 'views/main_shell.dart';
 enum EntryStage {
   splash,
   welcome,
+  login,
+  signup,
   app,
 }
 
@@ -48,10 +53,50 @@ class _CebMedAppState extends State<CebMedApp> {
         home = WelcomeView(
           onLogin: () {
             setState(() {
-              stage = EntryStage.app;
+              stage = EntryStage.login;
             });
           },
           onSignup: () {
+            setState(() {
+              stage = EntryStage.signup;
+            });
+          },
+        );
+        break;
+
+      case EntryStage.login:
+        home = LoginView(
+          onBack: () {
+            setState(() {
+              stage = EntryStage.welcome;
+            });
+          },
+          onGoSignup: () {
+            setState(() {
+              stage = EntryStage.signup;
+            });
+          },
+          onSuccess: () {
+            setState(() {
+              stage = EntryStage.app;
+            });
+          },
+        );
+        break;
+
+      case EntryStage.signup:
+        home = SignupView(
+          onBack: () {
+            setState(() {
+              stage = EntryStage.welcome;
+            });
+          },
+          onGoLogin: () {
+            setState(() {
+              stage = EntryStage.login;
+            });
+          },
+          onSuccess: () {
             setState(() {
               stage = EntryStage.app;
             });
@@ -62,6 +107,7 @@ class _CebMedAppState extends State<CebMedApp> {
       case EntryStage.app:
         home = MainShell(
           onLogout: () {
+            ApiService.clearToken();
             setState(() {
               stage = EntryStage.welcome;
             });
@@ -88,3 +134,4 @@ class _CebMedAppState extends State<CebMedApp> {
     );
   }
 }
+

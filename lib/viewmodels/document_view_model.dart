@@ -1,17 +1,31 @@
 ﻿import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../models/document_model.dart';
-import '../services/api_service.dart';
+import 'package:frontend_cebmed/services/api_service.dart';
 
 class DocumentActionResult {
   const DocumentActionResult({required this.success, required this.message});
 
   final bool success;
   final String message;
+}
+
+class PendingDocumentUpload {
+  const PendingDocumentUpload({
+    required this.fileName,
+    required this.bytes,
+    required this.suggestedName,
+  });
+
+  final String fileName;
+  final List<int> bytes;
+  final String suggestedName;
 }
 
 class DocumentViewModel extends ChangeNotifier {
@@ -57,7 +71,7 @@ class DocumentViewModel extends ChangeNotifier {
     }
   }
 
-  Future<DocumentActionResult?> importDocument() async {
+  Future<PendingDocumentUpload?> importDocument() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: const ['pdf', 'jpg', 'jpeg', 'png'],
@@ -70,22 +84,18 @@ class DocumentViewModel extends ChangeNotifier {
 
     final picked = result.files.first;
     if (picked.bytes == null && picked.path == null) {
-      return const DocumentActionResult(
-        success: false,
-        message: 'Fichier invalide',
-      );
+      return null;
     }
 
     final bytes = picked.bytes ?? await File(picked.path!).readAsBytes();
-
-    return _uploadNewDocument(
+    return PendingDocumentUpload(
       fileName: picked.name,
       bytes: bytes,
-      defaultName: picked.name,
+      suggestedName: _suggestNameFromFile(picked.name),
     );
   }
 
-  Future<DocumentActionResult?> scanDocument() async {
+  Future<PendingDocumentUpload?> scanDocument() async {
     final photo = await _imagePicker.pickImage(
       source: ImageSource.camera,
       imageQuality: 90,
@@ -96,11 +106,29 @@ class DocumentViewModel extends ChangeNotifier {
     }
 
     final bytes = await photo.readAsBytes();
-
-    return _uploadNewDocument(
+    return PendingDocumentUpload(
       fileName: photo.name,
       bytes: bytes,
-      defaultName: 'Ordonnance ${DateTime.now().toIso8601String()}',
+      suggestedName: 'Ordonnance',
+    );
+  }
+
+  Future<DocumentActionResult> confirmUpload({
+    required PendingDocumentUpload pending,
+    required String chosenName,
+  }) async {
+    final cleanName = chosenName.trim();
+    if (cleanName.isEmpty) {
+      return const DocumentActionResult(
+        success: false,
+        message: 'Le nom du document est obligatoire',
+      );
+    }
+
+    return _uploadNewDocument(
+      fileName: pending.fileName,
+      bytes: pending.bytes,
+      defaultName: cleanName,
     );
   }
 
@@ -149,6 +177,42 @@ class DocumentViewModel extends ChangeNotifier {
     }
   }
 
+  Future<DocumentActionResult> shareDocument(DocumentModel doc) async {
+    try {
+      final bytes = await ApiService.downloadDocument(
+        id: doc.id,
+        fileUrl: doc.fileUrl,
+      );
+
+      final ext = doc.filePath.contains('.')
+          ? doc.filePath.split('.').last.toLowerCase()
+          : 'pdf';
+      final mimeType = _mimeTypeFromExtension(ext);
+      final safeName = doc.name.trim().isEmpty ? 'document_${doc.id}' : doc.name.trim();
+
+      final xFile = XFile.fromData(
+        Uint8List.fromList(bytes),
+        mimeType: mimeType,
+        name: '$safeName.$ext',
+      );
+
+      await Share.shareXFiles(
+        [xFile],
+        text: safeName,
+      );
+
+      return const DocumentActionResult(
+        success: true,
+        message: 'Partage ouvert',
+      );
+    } catch (e) {
+      return DocumentActionResult(
+        success: false,
+        message: 'Partage échoué: $e',
+      );
+    }
+  }
+
   String detectType(String fileName) {
     final ext = fileName.split('.').last.toLowerCase();
     switch (ext) {
@@ -161,6 +225,28 @@ class DocumentViewModel extends ChangeNotifier {
       default:
         return 'AUTRE';
     }
+  }
+
+  String _mimeTypeFromExtension(String ext) {
+    switch (ext) {
+      case 'pdf':
+        return 'application/pdf';
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      default:
+        return 'application/octet-stream';
+    }
+  }
+
+  String _suggestNameFromFile(String fileName) {
+    final index = fileName.lastIndexOf('.');
+    if (index <= 0) {
+      return fileName;
+    }
+    return fileName.substring(0, index);
   }
 
   Future<DocumentActionResult> _uploadNewDocument({
@@ -197,3 +283,5 @@ class DocumentViewModel extends ChangeNotifier {
     }
   }
 }
+
+

@@ -1,9 +1,9 @@
 ﻿import 'package:flutter/material.dart';
 
-import 'home/home_view.dart';
-import 'agenda/appointment_view.dart';
-import 'ordonnances/document_view.dart';
-import 'profile/profile_view.dart';
+import 'package:frontend_cebmed/views/home/home_view.dart';
+import 'package:frontend_cebmed/views/agenda/appointment_view.dart';
+import 'package:frontend_cebmed/views/ordonnances/document_view.dart';
+import 'package:frontend_cebmed/views/profile/profile_view.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({
@@ -64,3 +64,4 @@ class _MainShellState extends State<MainShell> {
     );
   }
 }
+

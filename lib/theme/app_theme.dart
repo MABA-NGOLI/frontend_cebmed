@@ -1,11 +1,11 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 class AppTheme {
   // principales
   static const Color white = Color(0xFFFFFFFF);
   static const Color black = Color(0xFF000000);
 
-  // charte complémentaire
+  // charte complÃ©mentaire
   static const Color primaryPink = Color(0xFFE88FCF);
   static const Color softPink = Color(0xFFF6CAE8);
   static const Color primaryBlue = Color(0xFF92BBF6);
@@ -39,7 +39,7 @@ class AppTheme {
         // GRANDSTANDER
         displayLarge: TextStyle(
           fontFamily: 'Grandstander',
-          fontSize: 54,
+          fontSize: 48,
           fontWeight: FontWeight.w700,
         ),
 
@@ -57,7 +57,7 @@ class AppTheme {
 
         headlineSmall: TextStyle(
           fontFamily: 'Grandstander',
-          fontSize: 20,
+          fontSize: 18,
           fontWeight: FontWeight.w600,
         ),
 

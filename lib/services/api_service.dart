@@ -8,6 +8,7 @@ import '../models/document_model.dart';
 
 class ApiService {
   static final String baseUrl = _resolveBaseUrl();
+  static final String _apiOrigin = _resolveApiOrigin();
 
   static String _resolveBaseUrl() {
     if (kIsWeb) {
@@ -19,6 +20,12 @@ class ApiService {
     }
 
     return 'http://localhost:3000/api';
+  }
+
+  static String _resolveApiOrigin() {
+    final uri = Uri.parse(baseUrl);
+    final port = uri.hasPort ? ':${uri.port}' : '';
+    return '${uri.scheme}://${uri.host}$port';
   }
 
   static String? token;
@@ -66,7 +73,18 @@ class ApiService {
     );
 
     final data = jsonDecode(response.body) as Map<String, dynamic>;
-    token = data['token'] as String?;
+
+    if (response.statusCode != 200) {
+      final backendMessage = data['message']?.toString();
+      throw Exception(backendMessage ?? 'Connexion impossible');
+    }
+
+    final receivedToken = data['token'] as String?;
+    if (receivedToken == null || receivedToken.isEmpty) {
+      throw Exception('Connexion invalide, veuillez reessayer');
+    }
+
+    token = receivedToken;
     return data;
   }
 
@@ -114,8 +132,8 @@ class ApiService {
         'title': title,
         'description': description,
         'location': location,
-        'start_time': startTime.toIso8601String(),
-        'end_time': endTime.toIso8601String(),
+        'start_time': startTime.toUtc().toIso8601String(),
+        'end_time': endTime.toUtc().toIso8601String(),
         'notifications_enabled': notificationsEnabled,
         'consultation_type': consultationType,
         'reminder_delay': reminderDelay,
@@ -155,19 +173,21 @@ class ApiService {
     String? consultationType,
     int? reminderDelay,
   }) async {
+    final Map<String, dynamic> payload = {
+      if (title != null) 'title': title,
+      if (description != null) 'description': description,
+      if (location != null) 'location': location,
+      if (startTime != null) 'start_time': startTime.toUtc().toIso8601String(),
+      if (endTime != null) 'end_time': endTime.toUtc().toIso8601String(),
+      if (notificationsEnabled != null) 'notifications_enabled': notificationsEnabled,
+      if (consultationType != null) 'consultation_type': consultationType,
+      if (reminderDelay != null) 'reminder_delay': reminderDelay,
+    };
+
     final response = await http.put(
       Uri.parse('$baseUrl/appointments/$id'),
       headers: headers(),
-      body: jsonEncode({
-        'title': ?title,
-        'description': ?description,
-        'location': ?location,
-        'start_time': ?startTime?.toIso8601String(),
-        'end_time': ?endTime?.toIso8601String(),
-        'notifications_enabled': ?notificationsEnabled,
-        'consultation_type': ?consultationType,
-        'reminder_delay': ?reminderDelay,
-      }),
+      body: jsonEncode(payload),
     );
 
     if (response.statusCode != 200) {
@@ -233,16 +253,18 @@ class ApiService {
     String? fileName,
     List<int>? bytes,
   }) async {
+    final Map<String, dynamic> payload = {
+      if (name != null) 'name': name,
+      if (type != null) 'type': type,
+      if (description != null) 'description': description,
+      if (fileName != null) 'fileName': fileName,
+      if (bytes != null) 'contentBase64': base64Encode(bytes),
+    };
+
     final response = await http.put(
       Uri.parse('$baseUrl/documents/$id'),
       headers: headers(),
-      body: jsonEncode({
-        'name': ?name,
-        'type': ?type,
-        'description': ?description,
-        'fileName': ?fileName,
-        'contentBase64': ?(bytes == null ? null : base64Encode(bytes)),
-      }),
+      body: jsonEncode(payload),
     );
 
     if (response.statusCode != 200) {
@@ -266,4 +288,35 @@ class ApiService {
       );
     }
   }
+
+  static Future<List<int>> downloadDocument({
+    required int id,
+    String? fileUrl,
+  }) async {
+    final endpoint = fileUrl?.trim().isNotEmpty == true
+        ? fileUrl!.trim()
+        : '/api/documents/$id/download';
+
+    final absoluteUrl = endpoint.startsWith('http')
+        ? endpoint
+        : '$_apiOrigin$endpoint';
+
+    final response = await http.get(
+      Uri.parse(absoluteUrl),
+      headers: headers(),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Erreur téléchargement document (HTTP ${response.statusCode})',
+      );
+    }
+
+    return response.bodyBytes;
+  }
+
+  static void clearToken() {
+    token = null;
+  }
 }
+

@@ -261,11 +261,18 @@ class ReminderCard extends StatelessWidget {
 }
 
 class SaveAppointmentButton extends StatelessWidget {
-  const SaveAppointmentButton({super.key, required this.isSaving, required this.onPressed, this.compact = false});
+  const SaveAppointmentButton({
+    super.key,
+    required this.isSaving,
+    required this.onPressed,
+    this.compact = false,
+    this.label = 'Enregistrer le rendez-vous',
+  });
 
   final bool isSaving;
   final VoidCallback onPressed;
   final bool compact;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
@@ -277,7 +284,7 @@ class SaveAppointmentButton extends StatelessWidget {
             ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
             : Icon(Icons.save_outlined, size: compact ? 16 : 18),
         label: Text(
-          isSaving ? 'Enregistrement...' : 'Enregistrer le rendez-vous',
+          isSaving ? 'Enregistrement...' : label,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),

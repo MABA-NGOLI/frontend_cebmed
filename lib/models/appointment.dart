@@ -1,6 +1,6 @@
-class Appointment {
+﻿class Appointment {
   final int id;
-  final String userId;
+  final int userId;
   final String title;
   final String? description;
   final String? location;
@@ -33,7 +33,7 @@ class Appointment {
   factory Appointment.fromJson(Map<String, dynamic> json) {
     return Appointment(
       id: json['id'] as int,
-      userId: json['user_id'] as String,
+      userId: (json['user_id'] as num).toInt(),
       title: json['title'] as String,
       description: json['description'] as String?,
       location: json['location'] as String?,
@@ -41,7 +41,7 @@ class Appointment {
       endTime: DateTime.parse(json['end_time'] as String),
       notificationsEnabled:
       (json['notifications_enabled'] ?? false) as bool,
-      consultationType: json['consultation_type'] as String?,
+      consultationType: (json['consultation_type'] ?? json['consultationType']) as String?,
       reminderDelay: json['reminder_delay'] as int?,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),

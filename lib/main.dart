@@ -3,6 +3,9 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'theme/app_theme.dart';
+import 'views/authentication/login_view.dart';
+import 'views/authentication/role_selection_view.dart';
+import 'views/authentication/signup_view.dart';
 import 'views/entry/splash_view.dart';
 import 'views/entry/welcome_view.dart';
 import 'views/main_shell.dart';
@@ -10,6 +13,9 @@ import 'views/main_shell.dart';
 enum EntryStage {
   splash,
   welcome,
+  login,
+  signup,
+  roleSelection,
   app,
 }
 
@@ -48,10 +54,60 @@ class _CebMedAppState extends State<CebMedApp> {
         home = WelcomeView(
           onLogin: () {
             setState(() {
-              stage = EntryStage.app;
+              stage = EntryStage.login;
             });
           },
           onSignup: () {
+            setState(() {
+              stage = EntryStage.signup;
+            });
+          },
+        );
+        break;
+
+      case EntryStage.login:
+        home = LoginView(
+          onBack: () {
+            setState(() {
+              stage = EntryStage.welcome;
+            });
+          },
+          onSuccess: () {
+            setState(() {
+              stage = EntryStage.roleSelection;
+            });
+          },
+          onGoSignup: () {
+            setState(() {
+              stage = EntryStage.signup;
+            });
+          },
+        );
+        break;
+
+      case EntryStage.signup:
+        home = SignupView(
+          onBack: () {
+            setState(() {
+              stage = EntryStage.welcome;
+            });
+          },
+          onSuccess: () {
+            setState(() {
+              stage = EntryStage.roleSelection;
+            });
+          },
+          onGoLogin: () {
+            setState(() {
+              stage = EntryStage.login;
+            });
+          },
+        );
+        break;
+
+      case EntryStage.roleSelection:
+        home = RoleSelectionView(
+          onSelectRole: (role) {
             setState(() {
               stage = EntryStage.app;
             });

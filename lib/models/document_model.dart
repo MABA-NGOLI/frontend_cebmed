@@ -1,6 +1,6 @@
 ﻿class DocumentModel {
   final int id;
-  final String userId;
+  final int userId;
   final String name;
   final String type;
   final String? description;
@@ -24,7 +24,7 @@
   factory DocumentModel.fromJson(Map<String, dynamic> json) {
     return DocumentModel(
       id: json['id'] as int,
-      userId: json['user_id'] as String,
+      userId: (json['user_id'] as num).toInt(),
       name: json['name'] as String,
       type: json['type'] as String,
       description: json['description'] as String?,
@@ -35,4 +35,5 @@
     );
   }
 }
+
 

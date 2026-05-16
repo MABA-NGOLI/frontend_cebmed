@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/appointment.dart';
+import '../models/auth_models.dart';
 import '../models/document_model.dart';
 
 class ApiService {
@@ -49,13 +50,22 @@ class ApiService {
       }),
     );
 
-    return jsonDecode(response.body) as Map<String, dynamic>;
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+
+    if (response.statusCode != 201 && response.statusCode != 200) {
+      throw Exception(
+        (data['message'] ?? 'Inscription impossible').toString(),
+      );
+    }
+
+    return data;
   }
 
   static Future<Map<String, dynamic>> login({
     required String email,
     required String password,
   }) async {
+    token = null;
     final response = await http.post(
       Uri.parse('$baseUrl/auth/login'),
       headers: headers(),
@@ -66,17 +76,66 @@ class ApiService {
     );
 
     final data = jsonDecode(response.body) as Map<String, dynamic>;
+
+    if (response.statusCode != 200) {
+      token = null;
+      throw Exception(
+        (data['message'] ?? 'Email ou mot de passe incorrect').toString(),
+      );
+    }
+
     token = data['token'] as String?;
+
+    if (token == null || token!.isEmpty) {
+      token = null;
+      throw Exception('Token absent, connexion impossible');
+    }
+
     return data;
   }
 
-  static Future<Map<String, dynamic>> getMe() async {
+  static Future<MeResponse> getMe() async {
     final response = await http.get(
       Uri.parse('$baseUrl/auth/me'),
       headers: headers(),
     );
 
-    return jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode != 200) {
+      throw Exception('Erreur profil (HTTP ${response.statusCode}): ${response.body}');
+    }
+
+    return MeResponse.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  static Future<String> createCaregiverInviteCode() async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/caregiver-invites'),
+      headers: headers(),
+    );
+
+    if (response.statusCode != 201 && response.statusCode != 200) {
+      throw Exception('Erreur code de partage (HTTP ${response.statusCode}): ${response.body}');
+    }
+
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+
+    final dynamic data = body['data'];
+    final dynamic invite = body['invite'];
+
+    final code = (
+      body['code'] ??
+      body['invite_code'] ??
+      (data is Map<String, dynamic> ? data['code'] : null) ??
+      (data is Map<String, dynamic> ? data['invite_code'] : null) ??
+      (invite is Map<String, dynamic> ? invite['code'] : null) ??
+      (invite is Map<String, dynamic> ? invite['invite_code'] : null)
+    )?.toString();
+
+    if (code == null || code.trim().isEmpty) {
+      throw Exception('Code de partage absent dans la réponse backend');
+    }
+
+    return code.trim();
   }
 
   static Future<List<Appointment>> getAppointments() async {
@@ -118,6 +177,7 @@ class ApiService {
         'end_time': endTime.toIso8601String(),
         'notifications_enabled': notificationsEnabled,
         'consultation_type': consultationType,
+        'consultationType': consultationType,
         'reminder_delay': reminderDelay,
       }),
     );
@@ -159,14 +219,15 @@ class ApiService {
       Uri.parse('$baseUrl/appointments/$id'),
       headers: headers(),
       body: jsonEncode({
-        'title': ?title,
-        'description': ?description,
-        'location': ?location,
-        'start_time': ?startTime?.toIso8601String(),
-        'end_time': ?endTime?.toIso8601String(),
-        'notifications_enabled': ?notificationsEnabled,
-        'consultation_type': ?consultationType,
-        'reminder_delay': ?reminderDelay,
+        if (title != null) 'title': title,
+        if (description != null) 'description': description,
+        if (location != null) 'location': location,
+        if (startTime != null) 'start_time': startTime.toIso8601String(),
+        if (endTime != null) 'end_time': endTime.toIso8601String(),
+        if (notificationsEnabled != null) 'notifications_enabled': notificationsEnabled,
+        'consultation_type': consultationType,
+        'consultationType': consultationType,
+        if (reminderDelay != null) 'reminder_delay': reminderDelay,
       }),
     );
 
@@ -237,11 +298,11 @@ class ApiService {
       Uri.parse('$baseUrl/documents/$id'),
       headers: headers(),
       body: jsonEncode({
-        'name': ?name,
-        'type': ?type,
-        'description': ?description,
-        'fileName': ?fileName,
-        'contentBase64': ?(bytes == null ? null : base64Encode(bytes)),
+        if (name != null) 'name': name,
+        if (type != null) 'type': type,
+        if (description != null) 'description': description,
+        if (fileName != null) 'fileName': fileName,
+        if (bytes != null) 'contentBase64': base64Encode(bytes),
       }),
     );
 
@@ -265,5 +326,45 @@ class ApiService {
         'Erreur suppression document (HTTP ${response.statusCode}): ${response.body}',
       );
     }
+  }
+
+  static Future<List<int>> downloadDocument({
+    required int id,
+    String? fileUrl,
+  }) async {
+    final candidates = <Uri>[
+      Uri.parse('$baseUrl/documents/$id/download'),
+      Uri.parse('$baseUrl/documents/$id/file'),
+      if (fileUrl != null && fileUrl.trim().isNotEmpty) Uri.parse(fileUrl),
+    ];
+
+    Object? lastError;
+
+    for (final uri in candidates) {
+      try {
+        final response = await http.get(uri, headers: headers());
+
+        if (response.statusCode != 200) {
+          lastError = Exception('HTTP ${response.statusCode} on $uri');
+          continue;
+        }
+
+        final contentType = response.headers['content-type'] ?? '';
+        if (contentType.contains('application/json')) {
+          final json = jsonDecode(response.body) as Map<String, dynamic>;
+          final contentBase64 = json['contentBase64'] as String?;
+          if (contentBase64 == null || contentBase64.isEmpty) {
+            throw Exception('Réponse JSON sans contentBase64');
+          }
+          return base64Decode(contentBase64);
+        }
+
+        return response.bodyBytes;
+      } catch (e) {
+        lastError = e;
+      }
+    }
+
+    throw Exception('Téléchargement document impossible: $lastError');
   }
 }

@@ -33,6 +33,7 @@ class _MainShellState extends State<MainShell> {
       body: _pages[_currentIndex],
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
         onDestinationSelected: (value) {
           setState(() {
             _currentIndex = value;

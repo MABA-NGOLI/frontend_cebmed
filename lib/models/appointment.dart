@@ -1,6 +1,6 @@
 ﻿class Appointment {
   final int id;
-  final String userId;
+  final int userId;
   final String title;
   final String? description;
   final String? location;
@@ -31,24 +31,20 @@
   });
 
   factory Appointment.fromJson(Map<String, dynamic> json) {
-    final parsedStart = DateTime.parse(json['start_time'] as String).toLocal();
-    final parsedEnd = DateTime.parse(json['end_time'] as String).toLocal();
-    final parsedCreatedAt = DateTime.parse(json['created_at'] as String).toLocal();
-    final parsedUpdatedAt = DateTime.parse(json['updated_at'] as String).toLocal();
-
     return Appointment(
       id: json['id'] as int,
-      userId: json['user_id'] as String,
+      userId: (json['user_id'] as num).toInt(),
       title: json['title'] as String,
       description: json['description'] as String?,
       location: json['location'] as String?,
-      startTime: parsedStart,
-      endTime: parsedEnd,
-      notificationsEnabled: (json['notifications_enabled'] ?? false) as bool,
-      consultationType: json['consultation_type'] as String?,
+      startTime: DateTime.parse(json['start_time'] as String),
+      endTime: DateTime.parse(json['end_time'] as String),
+      notificationsEnabled:
+      (json['notifications_enabled'] ?? false) as bool,
+      consultationType: (json['consultation_type'] ?? json['consultationType']) as String?,
       reminderDelay: json['reminder_delay'] as int?,
-      createdAt: parsedCreatedAt,
-      updatedAt: parsedUpdatedAt,
+      createdAt: DateTime.parse(json['created_at'] as String),
+      updatedAt: DateTime.parse(json['updated_at'] as String),
     );
   }
 

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 enum SplashResult {
   welcome,
@@ -25,7 +25,7 @@ class _SplashViewState extends State<SplashView> {
 
   Future<void> _bootstrap() async {
     await Future.delayed(
-      const Duration(seconds: 5),
+      const Duration(seconds: 3),
     );
 
     if (!mounted) return;

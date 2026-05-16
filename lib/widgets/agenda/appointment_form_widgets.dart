@@ -133,6 +133,8 @@ class ConsultationTypeField extends StatelessWidget {
 
   String _labelForType(String type) {
     switch (type) {
+      case 'NON_RENSEIGNE':
+        return 'Non renseigne';
       case 'PRESENTIAL':
         return 'Présentiel';
       case 'VIDEO':
@@ -265,14 +267,14 @@ class SaveAppointmentButton extends StatelessWidget {
     super.key,
     required this.isSaving,
     required this.onPressed,
-    this.compact = false,
     this.label = 'Enregistrer le rendez-vous',
+    this.compact = false,
   });
 
   final bool isSaving;
   final VoidCallback onPressed;
-  final bool compact;
   final String label;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {

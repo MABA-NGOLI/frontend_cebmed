@@ -4,11 +4,11 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/appointment.dart';
+import '../models/auth_models.dart';
 import '../models/document_model.dart';
 
 class ApiService {
   static final String baseUrl = _resolveBaseUrl();
-  static final String _apiOrigin = _resolveApiOrigin();
 
   static String _resolveBaseUrl() {
     if (kIsWeb) {
@@ -20,12 +20,6 @@ class ApiService {
     }
 
     return 'http://localhost:3000/api';
-  }
-
-  static String _resolveApiOrigin() {
-    final uri = Uri.parse(baseUrl);
-    final port = uri.hasPort ? ':${uri.port}' : '';
-    return '${uri.scheme}://${uri.host}$port';
   }
 
   static String? token;
@@ -56,13 +50,22 @@ class ApiService {
       }),
     );
 
-    return jsonDecode(response.body) as Map<String, dynamic>;
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+
+    if (response.statusCode != 201 && response.statusCode != 200) {
+      throw Exception(
+        (data['message'] ?? 'Inscription impossible').toString(),
+      );
+    }
+
+    return data;
   }
 
   static Future<Map<String, dynamic>> login({
     required String email,
     required String password,
   }) async {
+    token = null;
     final response = await http.post(
       Uri.parse('$baseUrl/auth/login'),
       headers: headers(),
@@ -75,26 +78,64 @@ class ApiService {
     final data = jsonDecode(response.body) as Map<String, dynamic>;
 
     if (response.statusCode != 200) {
-      final backendMessage = data['message']?.toString();
-      throw Exception(backendMessage ?? 'Connexion impossible');
+      token = null;
+      throw Exception(
+        (data['message'] ?? 'Email ou mot de passe incorrect').toString(),
+      );
     }
 
-    final receivedToken = data['token'] as String?;
-    if (receivedToken == null || receivedToken.isEmpty) {
-      throw Exception('Connexion invalide, veuillez reessayer');
+    token = data['token'] as String?;
+
+    if (token == null || token!.isEmpty) {
+      token = null;
+      throw Exception('Token absent, connexion impossible');
     }
 
-    token = receivedToken;
     return data;
   }
 
-  static Future<Map<String, dynamic>> getMe() async {
+  static Future<MeResponse> getMe() async {
     final response = await http.get(
       Uri.parse('$baseUrl/auth/me'),
       headers: headers(),
     );
 
-    return jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode != 200) {
+      throw Exception('Erreur profil (HTTP ${response.statusCode}): ${response.body}');
+    }
+
+    return MeResponse.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  static Future<String> createCaregiverInviteCode() async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/caregiver-invites'),
+      headers: headers(),
+    );
+
+    if (response.statusCode != 201 && response.statusCode != 200) {
+      throw Exception('Erreur code de partage (HTTP ${response.statusCode}): ${response.body}');
+    }
+
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+
+    final dynamic data = body['data'];
+    final dynamic invite = body['invite'];
+
+    final code = (
+      body['code'] ??
+      body['invite_code'] ??
+      (data is Map<String, dynamic> ? data['code'] : null) ??
+      (data is Map<String, dynamic> ? data['invite_code'] : null) ??
+      (invite is Map<String, dynamic> ? invite['code'] : null) ??
+      (invite is Map<String, dynamic> ? invite['invite_code'] : null)
+    )?.toString();
+
+    if (code == null || code.trim().isEmpty) {
+      throw Exception('Code de partage absent dans la réponse backend');
+    }
+
+    return code.trim();
   }
 
   static Future<List<Appointment>> getAppointments() async {
@@ -132,10 +173,11 @@ class ApiService {
         'title': title,
         'description': description,
         'location': location,
-        'start_time': startTime.toUtc().toIso8601String(),
-        'end_time': endTime.toUtc().toIso8601String(),
+        'start_time': startTime.toIso8601String(),
+        'end_time': endTime.toIso8601String(),
         'notifications_enabled': notificationsEnabled,
         'consultation_type': consultationType,
+        'consultationType': consultationType,
         'reminder_delay': reminderDelay,
       }),
     );
@@ -173,21 +215,20 @@ class ApiService {
     String? consultationType,
     int? reminderDelay,
   }) async {
-    final Map<String, dynamic> payload = {
-      if (title != null) 'title': title,
-      if (description != null) 'description': description,
-      if (location != null) 'location': location,
-      if (startTime != null) 'start_time': startTime.toUtc().toIso8601String(),
-      if (endTime != null) 'end_time': endTime.toUtc().toIso8601String(),
-      if (notificationsEnabled != null) 'notifications_enabled': notificationsEnabled,
-      if (consultationType != null) 'consultation_type': consultationType,
-      if (reminderDelay != null) 'reminder_delay': reminderDelay,
-    };
-
     final response = await http.put(
       Uri.parse('$baseUrl/appointments/$id'),
       headers: headers(),
-      body: jsonEncode(payload),
+      body: jsonEncode({
+        if (title != null) 'title': title,
+        if (description != null) 'description': description,
+        if (location != null) 'location': location,
+        if (startTime != null) 'start_time': startTime.toIso8601String(),
+        if (endTime != null) 'end_time': endTime.toIso8601String(),
+        if (notificationsEnabled != null) 'notifications_enabled': notificationsEnabled,
+        'consultation_type': consultationType,
+        'consultationType': consultationType,
+        if (reminderDelay != null) 'reminder_delay': reminderDelay,
+      }),
     );
 
     if (response.statusCode != 200) {
@@ -253,18 +294,16 @@ class ApiService {
     String? fileName,
     List<int>? bytes,
   }) async {
-    final Map<String, dynamic> payload = {
-      if (name != null) 'name': name,
-      if (type != null) 'type': type,
-      if (description != null) 'description': description,
-      if (fileName != null) 'fileName': fileName,
-      if (bytes != null) 'contentBase64': base64Encode(bytes),
-    };
-
     final response = await http.put(
       Uri.parse('$baseUrl/documents/$id'),
       headers: headers(),
-      body: jsonEncode(payload),
+      body: jsonEncode({
+        if (name != null) 'name': name,
+        if (type != null) 'type': type,
+        if (description != null) 'description': description,
+        if (fileName != null) 'fileName': fileName,
+        if (bytes != null) 'contentBase64': base64Encode(bytes),
+      }),
     );
 
     if (response.statusCode != 200) {
@@ -293,30 +332,39 @@ class ApiService {
     required int id,
     String? fileUrl,
   }) async {
-    final endpoint = fileUrl?.trim().isNotEmpty == true
-        ? fileUrl!.trim()
-        : '/api/documents/$id/download';
+    final candidates = <Uri>[
+      Uri.parse('$baseUrl/documents/$id/download'),
+      Uri.parse('$baseUrl/documents/$id/file'),
+      if (fileUrl != null && fileUrl.trim().isNotEmpty) Uri.parse(fileUrl),
+    ];
 
-    final absoluteUrl = endpoint.startsWith('http')
-        ? endpoint
-        : '$_apiOrigin$endpoint';
+    Object? lastError;
 
-    final response = await http.get(
-      Uri.parse(absoluteUrl),
-      headers: headers(),
-    );
+    for (final uri in candidates) {
+      try {
+        final response = await http.get(uri, headers: headers());
 
-    if (response.statusCode != 200) {
-      throw Exception(
-        'Erreur téléchargement document (HTTP ${response.statusCode})',
-      );
+        if (response.statusCode != 200) {
+          lastError = Exception('HTTP ${response.statusCode} on $uri');
+          continue;
+        }
+
+        final contentType = response.headers['content-type'] ?? '';
+        if (contentType.contains('application/json')) {
+          final json = jsonDecode(response.body) as Map<String, dynamic>;
+          final contentBase64 = json['contentBase64'] as String?;
+          if (contentBase64 == null || contentBase64.isEmpty) {
+            throw Exception('Réponse JSON sans contentBase64');
+          }
+          return base64Decode(contentBase64);
+        }
+
+        return response.bodyBytes;
+      } catch (e) {
+        lastError = e;
+      }
     }
 
-    return response.bodyBytes;
-  }
-
-  static void clearToken() {
-    token = null;
+    throw Exception('Téléchargement document impossible: $lastError');
   }
 }
-

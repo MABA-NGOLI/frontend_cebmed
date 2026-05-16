@@ -1,10 +1,10 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
-import 'package:frontend_cebmed/services/api_service.dart';
 import 'theme/app_theme.dart';
 import 'views/authentication/login_view.dart';
+import 'views/authentication/role_selection_view.dart';
 import 'views/authentication/signup_view.dart';
 import 'views/entry/splash_view.dart';
 import 'views/entry/welcome_view.dart';
@@ -15,6 +15,7 @@ enum EntryStage {
   welcome,
   login,
   signup,
+  roleSelection,
   app,
 }
 
@@ -71,14 +72,14 @@ class _CebMedAppState extends State<CebMedApp> {
               stage = EntryStage.welcome;
             });
           },
+          onSuccess: () {
+            setState(() {
+              stage = EntryStage.roleSelection;
+            });
+          },
           onGoSignup: () {
             setState(() {
               stage = EntryStage.signup;
-            });
-          },
-          onSuccess: () {
-            setState(() {
-              stage = EntryStage.app;
             });
           },
         );
@@ -91,12 +92,22 @@ class _CebMedAppState extends State<CebMedApp> {
               stage = EntryStage.welcome;
             });
           },
+          onSuccess: () {
+            setState(() {
+              stage = EntryStage.roleSelection;
+            });
+          },
           onGoLogin: () {
             setState(() {
               stage = EntryStage.login;
             });
           },
-          onSuccess: () {
+        );
+        break;
+
+      case EntryStage.roleSelection:
+        home = RoleSelectionView(
+          onSelectRole: (role) {
             setState(() {
               stage = EntryStage.app;
             });
@@ -107,7 +118,6 @@ class _CebMedAppState extends State<CebMedApp> {
       case EntryStage.app:
         home = MainShell(
           onLogout: () {
-            ApiService.clearToken();
             setState(() {
               stage = EntryStage.welcome;
             });
@@ -134,4 +144,3 @@ class _CebMedAppState extends State<CebMedApp> {
     );
   }
 }
-

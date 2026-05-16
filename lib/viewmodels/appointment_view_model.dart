@@ -1,49 +1,54 @@
 ﻿import 'package:flutter/material.dart';
 
-import 'package:frontend_cebmed/models/appointment.dart';
-import 'package:frontend_cebmed/services/api_service.dart';
+import '../models/appointment.dart';
+import '../services/api_service.dart';
 
 class AppointmentViewModel extends ChangeNotifier {
-  AppointmentViewModel({Appointment? initialAppointment}) {
-    final now = DateTime.now();
-    final initialStart = initialAppointment?.startTime ?? now;
-    final initialEnd = initialAppointment?.endTime ?? initialStart.add(const Duration(minutes: 30));
+  AppointmentViewModel({Appointment? initialAppointment})
+      : _editingAppointmentId = initialAppointment?.id {
+    if (initialAppointment == null) {
+      selectedDate = DateTime.now();
+      selectedStartTime = TimeOfDay.fromDateTime(DateTime.now());
+      selectedEndTime = TimeOfDay.fromDateTime(
+        DateTime.now().add(const Duration(minutes: 30)),
+      );
+      return;
+    }
 
-    selectedDate = initialStart;
-    selectedTime = TimeOfDay.fromDateTime(initialStart);
-    selectedEndTime = TimeOfDay.fromDateTime(initialEnd);
-
-    editingAppointmentId = initialAppointment?.id;
-
-    titleController.text = initialAppointment?.title ?? '';
-    locationController.text = initialAppointment?.location ?? '';
-    descriptionController.text = initialAppointment?.description ?? '';
-
-    notificationsEnabled = initialAppointment?.notificationsEnabled ?? true;
-    consultationType = _safeConsultationType(initialAppointment?.consultationType);
-    reminderDelayLabel = _labelFromReminderDelay(initialAppointment?.reminderDelay);
+    titleController.text = initialAppointment.title;
+    locationController.text = initialAppointment.location ?? '';
+    descriptionController.text = initialAppointment.description ?? '';
+    selectedDate = DateTime(
+      initialAppointment.startTime.year,
+      initialAppointment.startTime.month,
+      initialAppointment.startTime.day,
+    );
+    selectedStartTime = TimeOfDay.fromDateTime(initialAppointment.startTime);
+    selectedEndTime = TimeOfDay.fromDateTime(initialAppointment.endTime);
+    notificationsEnabled = initialAppointment.notificationsEnabled;
+    consultationType = initialAppointment.consultationType ?? 'NON_RENSEIGNE';
+    reminderDelayLabel = _mapMinutesToReminderLabel(initialAppointment.reminderDelay);
   }
 
   final TextEditingController titleController = TextEditingController();
   final TextEditingController locationController = TextEditingController();
   final TextEditingController descriptionController = TextEditingController();
+  final int? _editingAppointmentId;
 
   late DateTime selectedDate;
-  late TimeOfDay selectedTime;
+  late TimeOfDay selectedStartTime;
   late TimeOfDay selectedEndTime;
-
-  int? editingAppointmentId;
-
   bool notificationsEnabled = true;
-  String consultationType = 'PRESENTIAL';
+  String consultationType = 'NON_RENSEIGNE';
   String reminderDelayLabel = '1h avant';
 
   bool isSaving = false;
   String? lastError;
 
-  bool get isEditing => editingAppointmentId != null;
+  bool get isEditing => _editingAppointmentId != null;
 
   final List<String> consultationTypes = const [
+    'NON_RENSEIGNE',
     'PRESENTIAL',
     'VIDEO',
     'PHONE',
@@ -55,31 +60,11 @@ class AppointmentViewModel extends ChangeNotifier {
     '1 jour avant',
   ];
 
-  String _safeConsultationType(String? value) {
-    if (consultationTypes.contains(value)) {
-      return value!;
-    }
-    return 'PRESENTIAL';
-  }
-
-  String _labelFromReminderDelay(int? delay) {
-    switch (delay) {
-      case 30:
-        return '30 min avant';
-      case 60:
-        return '1h avant';
-      case 1440:
-        return '1 jour avant';
-      default:
-        return '1h avant';
-    }
-  }
-
   String get formattedDate =>
       '${selectedDate.day.toString().padLeft(2, '0')}/${selectedDate.month.toString().padLeft(2, '0')}/${selectedDate.year}';
 
-  String get formattedTime =>
-      '${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}';
+  String get formattedStartTime =>
+      '${selectedStartTime.hour.toString().padLeft(2, '0')}:${selectedStartTime.minute.toString().padLeft(2, '0')}';
 
   String get formattedEndTime =>
       '${selectedEndTime.hour.toString().padLeft(2, '0')}:${selectedEndTime.minute.toString().padLeft(2, '0')}';
@@ -100,17 +85,17 @@ class AppointmentViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> pickTime(BuildContext context) async {
+  Future<void> pickStartTime(BuildContext context) async {
     final picked = await showTimePicker(
       context: context,
-      initialTime: selectedTime,
+      initialTime: selectedStartTime,
     );
 
     if (picked == null) {
       return;
     }
 
-    selectedTime = picked;
+    selectedStartTime = picked;
     notifyListeners();
   }
 
@@ -143,12 +128,12 @@ class AppointmentViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  DateTime get selectedDateTime => DateTime(
+  DateTime get selectedStartDateTime => DateTime(
         selectedDate.year,
         selectedDate.month,
         selectedDate.day,
-        selectedTime.hour,
-        selectedTime.minute,
+        selectedStartTime.hour,
+        selectedStartTime.minute,
       );
 
   DateTime get selectedEndDateTime => DateTime(
@@ -177,6 +162,19 @@ class AppointmentViewModel extends ChangeNotifier {
     }
   }
 
+  String _mapMinutesToReminderLabel(int? minutes) {
+    switch (minutes) {
+      case 30:
+        return '30 min avant';
+      case 60:
+        return '1h avant';
+      case 1440:
+        return '1 jour avant';
+      default:
+        return '1h avant';
+    }
+  }
+
   Future<bool> saveAppointment() async {
     if (!validateRequiredFields()) {
       lastError = 'Nom et lieu sont obligatoires';
@@ -189,11 +187,11 @@ class AppointmentViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final start = selectedDateTime;
+      final start = selectedStartDateTime;
       final end = selectedEndDateTime;
 
       if (!end.isAfter(start)) {
-        lastError = 'Heure de fin doit être après l\'heure de début';
+        lastError = 'L heure de fin doit etre apres l heure de debut';
         isSaving = false;
         notifyListeners();
         return false;
@@ -201,7 +199,7 @@ class AppointmentViewModel extends ChangeNotifier {
 
       if (isEditing) {
         await ApiService.updateAppointment(
-          id: editingAppointmentId!,
+          id: _editingAppointmentId!,
           title: titleController.text.trim(),
           description: descriptionController.text.trim().isEmpty
               ? null
@@ -210,7 +208,7 @@ class AppointmentViewModel extends ChangeNotifier {
           startTime: start,
           endTime: end,
           notificationsEnabled: notificationsEnabled,
-          consultationType: consultationType,
+          consultationType: consultationType == 'NON_RENSEIGNE' ? null : consultationType,
           reminderDelay: _mapReminderDelayToMinutes(),
         );
       } else {
@@ -223,7 +221,7 @@ class AppointmentViewModel extends ChangeNotifier {
           startTime: start,
           endTime: end,
           notificationsEnabled: notificationsEnabled,
-          consultationType: consultationType,
+          consultationType: consultationType == 'NON_RENSEIGNE' ? null : consultationType,
           reminderDelay: _mapReminderDelayToMinutes(),
         );
       }
@@ -232,9 +230,21 @@ class AppointmentViewModel extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      lastError = isEditing
-          ? 'Echec de modification du rendez-vous'
-          : 'Echec de creation du rendez-vous';
+      final message = e.toString();
+      if (message.contains('401') || message.toLowerCase().contains('unauthorized')) {
+        lastError = 'Session expiree. Reconnecte-toi.';
+      } else if (message.contains('403')) {
+        lastError = 'Acces refuse pour cette action.';
+      } else if (message.contains('400')) {
+        lastError = 'Donnees invalides. Verifie les champs.';
+      } else if (message.contains('500')) {
+        lastError = 'Erreur serveur. Reessaie dans un instant.';
+      } else {
+        lastError = isEditing
+            ? 'Echec de modification du rendez-vous: $message'
+            : 'Echec de creation du rendez-vous: $message';
+      }
+
       isSaving = false;
       notifyListeners();
       return false;
@@ -242,7 +252,9 @@ class AppointmentViewModel extends ChangeNotifier {
   }
 
   Future<bool> deleteAppointment() async {
-    if (!isEditing) {
+    if (_editingAppointmentId == null) {
+      lastError = 'Aucun rendez-vous a supprimer';
+      notifyListeners();
       return false;
     }
 
@@ -251,27 +263,23 @@ class AppointmentViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await ApiService.deleteAppointment(editingAppointmentId!);
+      await ApiService.deleteAppointment(_editingAppointmentId!);
       isSaving = false;
       notifyListeners();
       return true;
-    } catch (_) {
-      lastError = 'Echec de suppression du rendez-vous';
+    } catch (e) {
+      lastError = 'Echec de suppression du rendez-vous: $e';
       isSaving = false;
       notifyListeners();
       return false;
     }
   }
 
-  void disposeControllers() {
+  @override
+  void dispose() {
     titleController.dispose();
     locationController.dispose();
     descriptionController.dispose();
-  }
-
-  @override
-  void dispose() {
-    disposeControllers();
     super.dispose();
   }
 }

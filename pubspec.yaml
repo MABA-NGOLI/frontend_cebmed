@@ -35,8 +35,9 @@ flutter:
   assets:
       - assets/images/logo.png
       - assets/images/logo_text.png
-      - assets/legal/cgu.pdf
-
+      - assets/images/logo_two.png
+      - assets/images/card_docs.png
+      - assets/images/card_stock.png
   fonts:
       - family: Grandstander
         fonts:
@@ -64,4 +65,3 @@ flutter:
          - asset: assets/fonts/Montserrat-ExtraBoldItalic.ttf
            weight: 800
            style: italic
-

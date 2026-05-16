@@ -1,10 +1,10 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 import '../../models/appointment.dart';
+import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
-import 'package:frontend_cebmed/services/api_service.dart';
 import 'package:frontend_cebmed/views/agenda/appointment_form_view.dart';
 
 class AppointmentView extends StatefulWidget {
@@ -17,7 +17,6 @@ class AppointmentView extends StatefulWidget {
 class _AppointmentViewState extends State<AppointmentView> {
   DateTime _focusedDay = DateTime.now();
   DateTime _selectedDay = DateTime.now();
-  final ScrollController _pageScrollController = ScrollController();
 
   bool _isLoading = true;
   String? _error;
@@ -27,12 +26,6 @@ class _AppointmentViewState extends State<AppointmentView> {
   void initState() {
     super.initState();
     _loadAppointments();
-  }
-
-  @override
-  void dispose() {
-    _pageScrollController.dispose();
-    super.dispose();
   }
 
   Future<void> _loadAppointments() async {
@@ -62,14 +55,15 @@ class _AppointmentViewState extends State<AppointmentView> {
       ..sort((a, b) => a.startTime.compareTo(b.startTime));
   }
 
-  Future<void> _openAppointmentForm({Appointment? appointment}) async {
-    final changed = await Navigator.of(context).push<bool>(
+  Future<void> _editAppointment(Appointment appointment) async {
+    final updated = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => AppointmentFormView(initialAppointment: appointment),
       ),
     );
-    if (changed == true) {
-      _loadAppointments();
+
+    if (updated == true) {
+      await _loadAppointments();
     }
   }
 
@@ -85,10 +79,6 @@ class _AppointmentViewState extends State<AppointmentView> {
         final horizontal = compact ? 12.0 : 16.0;
         final maxWidth = width > 520 ? 520.0 : width;
 
-        final isToday = isSameDay(_selectedDay, DateTime.now());
-        final sectionTitle = isToday ? "Aujourd'hui" : 'Rendez-vous du jour';
-        final sectionDate = DateFormat('EEEE d MMMM', 'fr_FR').format(_selectedDay);
-
         return Scaffold(
           backgroundColor: AppTheme.background,
           body: SafeArea(
@@ -96,171 +86,123 @@ class _AppointmentViewState extends State<AppointmentView> {
               alignment: Alignment.topCenter,
               child: ConstrainedBox(
                 constraints: BoxConstraints(maxWidth: maxWidth),
-                child: Scrollbar(
-                  controller: _pageScrollController,
-                  thumbVisibility: true,
-                  child: CustomScrollView(
-                    controller: _pageScrollController,
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    slivers: [
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding: EdgeInsets.fromLTRB(horizontal, 10, horizontal, 0),
-                          child: Container(
-                            padding: EdgeInsets.fromLTRB(horizontal, compact ? 14 : 18, horizontal, compact ? 10 : 14),
-                            decoration: BoxDecoration(
-                              color: AppTheme.primaryPink,
-                              borderRadius: BorderRadius.circular(18),
-                            ),
-                            child: Column(
-                              children: [
-                                Text(
-                                  'Agenda',
-                                  style: (compact ? textTheme.headlineSmall : textTheme.headlineMedium)?.copyWith(color: AppTheme.white),
-                                ),
-                                SizedBox(height: compact ? 6 : 8),
-                                TableCalendar<Appointment>(
-                                  locale: 'fr_FR',
-                                  firstDay: DateTime(2020, 1, 1),
-                                  lastDay: DateTime(2100, 12, 31),
-                                  focusedDay: _focusedDay,
-                                  selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-                                  eventLoader: _appointmentsForDay,
-                                  headerStyle: HeaderStyle(
-                                    formatButtonVisible: false,
-                                    titleCentered: true,
-                                    leftChevronIcon: const Icon(Icons.chevron_left, color: AppTheme.white),
-                                    rightChevronIcon: const Icon(Icons.chevron_right, color: AppTheme.white),
-                                    titleTextStyle: (compact ? textTheme.titleMedium : textTheme.titleLarge)?.copyWith(color: AppTheme.white) ??
-                                        const TextStyle(color: AppTheme.white),
-                                  ),
-                                  daysOfWeekStyle: const DaysOfWeekStyle(
-                                    weekdayStyle: TextStyle(color: AppTheme.white),
-                                    weekendStyle: TextStyle(color: AppTheme.white),
-                                  ),
-                                  calendarStyle: CalendarStyle(
-                                    outsideTextStyle: const TextStyle(color: AppTheme.softPink),
-                                    defaultTextStyle: TextStyle(color: AppTheme.black, fontSize: compact ? 12 : 14),
-                                    weekendTextStyle: TextStyle(color: AppTheme.black, fontSize: compact ? 12 : 14),
-                                    markerDecoration: const BoxDecoration(color: AppTheme.primaryBlue, shape: BoxShape.circle),
-                                    markersMaxCount: 1,
-                                    selectedDecoration: const BoxDecoration(color: AppTheme.softGreen, shape: BoxShape.circle),
-                                    selectedTextStyle: const TextStyle(color: AppTheme.black),
-                                    todayDecoration: BoxDecoration(
-                                      color: AppTheme.softBlue,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(color: AppTheme.white, width: 1),
-                                    ),
-                                    todayTextStyle: const TextStyle(color: AppTheme.black),
-                                    cellMargin: EdgeInsets.all(compact ? 2 : 4),
-                                  ),
-                                  onDaySelected: (selectedDay, focusedDay) {
-                                    setState(() {
-                                      _selectedDay = selectedDay;
-                                      _focusedDay = focusedDay;
-                                    });
-                                  },
-                                  onPageChanged: (focusedDay) => _focusedDay = focusedDay,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding: EdgeInsets.fromLTRB(horizontal, compact ? 12 : 18, horizontal, 0),
-                          child: SizedBox(
-                            width: compact ? double.infinity : 300,
-                            child: OutlinedButton.icon(
-                              onPressed: () => _openAppointmentForm(),
-                              iconAlignment: IconAlignment.end,
-                              icon: const Icon(Icons.add, size: 18),
-                              label: Text(
-                                'Ajouter un rendez-vous',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: textTheme.bodyMedium,
-                              ),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: AppTheme.black,
-                                side: const BorderSide(color: AppTheme.primaryPink),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                                padding: EdgeInsets.symmetric(horizontal: compact ? 10 : 14, vertical: compact ? 10 : 12),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding: EdgeInsets.fromLTRB(horizontal, compact ? 12 : 18, horizontal, 0),
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: Scrollbar(
+                        thumbVisibility: true,
+                        child: SingleChildScrollView(
                           child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(sectionTitle, style: compact ? textTheme.titleMedium : textTheme.titleLarge),
-                              const SizedBox(height: 2),
-                              Text(sectionDate, style: textTheme.bodyMedium?.copyWith(color: Colors.black54)),
-                              const SizedBox(height: 10),
-                              const Divider(height: 1),
-                              const SizedBox(height: 12),
+                              Container(
+                                margin: EdgeInsets.fromLTRB(horizontal, 10, horizontal, 0),
+                                padding: EdgeInsets.fromLTRB(horizontal, compact ? 14 : 18, horizontal, compact ? 10 : 14),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primaryPink,
+                                  borderRadius: BorderRadius.circular(18),
+                                ),
+                                child: Column(
+                                  children: [
+                                    Text('Agenda', style: (compact ? textTheme.headlineSmall : textTheme.headlineMedium)?.copyWith(color: AppTheme.white)),
+                                    SizedBox(height: compact ? 6 : 8),
+                                    TableCalendar<Appointment>(
+                                      locale: 'fr_FR',
+                                      firstDay: DateTime(2020, 1, 1),
+                                      lastDay: DateTime(2100, 12, 31),
+                                      focusedDay: _focusedDay,
+                                      selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+                                      eventLoader: _appointmentsForDay,
+                                      headerStyle: HeaderStyle(
+                                        formatButtonVisible: false,
+                                        titleCentered: true,
+                                        leftChevronIcon: const Icon(Icons.chevron_left, color: AppTheme.white),
+                                        rightChevronIcon: const Icon(Icons.chevron_right, color: AppTheme.white),
+                                        titleTextStyle: (compact ? textTheme.titleMedium : textTheme.titleLarge)?.copyWith(color: AppTheme.white) ?? const TextStyle(color: AppTheme.white),
+                                      ),
+                                      daysOfWeekStyle: const DaysOfWeekStyle(
+                                        weekdayStyle: TextStyle(color: AppTheme.white),
+                                        weekendStyle: TextStyle(color: AppTheme.white),
+                                      ),
+                                      calendarBuilders: CalendarBuilders(
+                                        markerBuilder: (context, day, events) {
+                                          if (events.isEmpty) return const SizedBox.shrink();
+                                          return Align(
+                                            alignment: Alignment.bottomCenter,
+                                            child: Container(
+                                              width: 6,
+                                              height: 6,
+                                              margin: const EdgeInsets.only(bottom: 8),
+                                              decoration: const BoxDecoration(
+                                                color: AppTheme.primaryBlue,
+                                                shape: BoxShape.circle,
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                      calendarStyle: CalendarStyle(
+                                        outsideTextStyle: const TextStyle(color: AppTheme.softPink),
+                                        defaultTextStyle: TextStyle(color: AppTheme.black, fontSize: compact ? 12 : 14),
+                                        weekendTextStyle: TextStyle(color: AppTheme.black, fontSize: compact ? 12 : 14),
+                                        markersMaxCount: 1,
+                                        markerDecoration: const BoxDecoration(color: AppTheme.primaryBlue, shape: BoxShape.circle),
+                                        selectedDecoration: const BoxDecoration(color: AppTheme.softGreen, shape: BoxShape.circle),
+                                        selectedTextStyle: const TextStyle(color: AppTheme.black),
+                                        todayDecoration: BoxDecoration(
+                                          color: AppTheme.softBlue,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(color: AppTheme.white, width: 1),
+                                        ),
+                                        todayTextStyle: const TextStyle(color: AppTheme.black),
+                                        cellMargin: EdgeInsets.all(compact ? 2 : 4),
+                                      ),
+                                      onDaySelected: (selectedDay, focusedDay) {
+                                        setState(() {
+                                          _selectedDay = selectedDay;
+                                          _focusedDay = focusedDay;
+                                        });
+                                      },
+                                      onPageChanged: (focusedDay) => _focusedDay = focusedDay,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              SizedBox(height: compact ? 12 : 18),
+                              SizedBox(
+                                width: compact ? double.infinity : 300,
+                                child: Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: horizontal),
+                                  child: OutlinedButton.icon(
+                                    onPressed: () async {
+                                      final created = await Navigator.of(context).push<bool>(
+                                        MaterialPageRoute(builder: (_) => const AppointmentFormView()),
+                                      );
+                                      if (created == true) _loadAppointments();
+                                    },
+                                    iconAlignment: IconAlignment.end,
+                                    icon: const Icon(Icons.add, size: 18),
+                                    label: Text('Ajouter un rendez-vous', maxLines: 1, overflow: TextOverflow.ellipsis, style: textTheme.bodyMedium),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: AppTheme.black,
+                                      side: const BorderSide(color: AppTheme.primaryPink),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                      padding: EdgeInsets.symmetric(horizontal: compact ? 10 : 14, vertical: compact ? 10 : 12),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              SizedBox(height: compact ? 12 : 18),
+                              Padding(
+                                padding: EdgeInsets.symmetric(horizontal: horizontal),
+                                child: _buildAgendaSection(selectedDayAppointments, textTheme, compact),
+                              ),
+                              const SizedBox(height: 20),
                             ],
                           ),
                         ),
                       ),
-                      if (_isLoading)
-                        const SliverFillRemaining(
-                          hasScrollBody: false,
-                          child: Center(child: CircularProgressIndicator()),
-                        )
-                      else if (_error != null)
-                        SliverFillRemaining(
-                          hasScrollBody: false,
-                          child: Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(_error!, style: textTheme.bodyMedium?.copyWith(color: Colors.black54)),
-                                const SizedBox(height: 10),
-                                TextButton(onPressed: _loadAppointments, child: const Text('Réessayer')),
-                              ],
-                            ),
-                          ),
-                        )
-                      else if (_appointments.isEmpty)
-                        SliverFillRemaining(
-                          hasScrollBody: false,
-                          child: Center(
-                            child: Text(
-                              'Aucun rendez-vous enregistre pour le moment',
-                              style: textTheme.bodyMedium?.copyWith(color: Colors.black54),
-                            ),
-                          ),
-                        )
-                      else if (selectedDayAppointments.isEmpty)
-                        SliverToBoxAdapter(
-                          child: Padding(
-                            padding: EdgeInsets.fromLTRB(horizontal, 0, horizontal, 110),
-                            child: Text(
-                              'Aucun rendez-vous pour ce jour',
-                              style: textTheme.bodyMedium?.copyWith(color: Colors.black54),
-                            ),
-                          ),
-                        )
-                      else
-                        SliverPadding(
-                          padding: EdgeInsets.fromLTRB(horizontal, 0, horizontal, 110),
-                          sliver: SliverList.builder(
-                            itemCount: selectedDayAppointments.length,
-                            itemBuilder: (context, index) => _AppointmentCard(
-                              appointment: selectedDayAppointments[index],
-                              compact: compact,
-                              onTap: () => _openAppointmentForm(appointment: selectedDayAppointments[index]),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -269,18 +211,78 @@ class _AppointmentViewState extends State<AppointmentView> {
       },
     );
   }
+
+  Widget _buildAgendaSection(List<Appointment> selectedDayAppointments, TextTheme textTheme, bool compact) {
+    if (_isLoading) return const Center(child: CircularProgressIndicator());
+
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(_error!, style: textTheme.bodyMedium?.copyWith(color: Colors.black54)),
+            const SizedBox(height: 10),
+            TextButton(onPressed: _loadAppointments, child: const Text('Réessayer')),
+          ],
+        ),
+      );
+    }
+
+    if (_appointments.isEmpty) {
+      return Center(
+        child: Text('Aucun rendez-vous enregistre pour le moment', style: textTheme.bodyMedium?.copyWith(color: Colors.black54)),
+      );
+    }
+
+    final isToday = isSameDay(_selectedDay, DateTime.now());
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              isToday ? 'Aujourd\'hui' : 'Rendez-vous du jour',
+              style: compact ? textTheme.titleMedium : textTheme.titleLarge,
+            ),
+            Text(DateFormat('EEE d MMM', 'fr_FR').format(_selectedDay), style: compact ? textTheme.bodyLarge : textTheme.titleMedium),
+          ],
+        ),
+        const SizedBox(height: 10),
+        const Divider(height: 1),
+        const SizedBox(height: 12),
+        if (selectedDayAppointments.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text('Aucun rendez-vous pour ce jour', style: textTheme.bodyMedium?.copyWith(color: Colors.black54)),
+          )
+        else
+          ListView.builder(
+            itemCount: selectedDayAppointments.length,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemBuilder: (context, index) => _AppointmentCard(
+              appointment: selectedDayAppointments[index],
+              compact: compact,
+              onEdit: () => _editAppointment(selectedDayAppointments[index]),
+            ),
+          ),
+      ],
+    );
+  }
 }
 
 class _AppointmentCard extends StatelessWidget {
   const _AppointmentCard({
     required this.appointment,
     required this.compact,
-    required this.onTap,
+    required this.onEdit,
   });
 
   final Appointment appointment;
   final bool compact;
-  final VoidCallback onTap;
+  final VoidCallback onEdit;
 
   String _consultationTypeLabel(String? value) {
     switch (value) {
@@ -298,32 +300,15 @@ class _AppointmentCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final titleStyle = textTheme.titleMedium?.copyWith(
-      fontFamily: 'Montserrat',
-      fontSize: compact ? 15 : 16,
-      fontWeight: FontWeight.w700,
-    );
-    final consultationStyle = textTheme.titleLarge?.copyWith(
-      fontFamily: 'Montserrat',
-      fontSize: compact ? 17 : 19,
-      fontWeight: FontWeight.w700,
-    );
-    final labelStyle = textTheme.titleMedium?.copyWith(
-      fontFamily: 'Montserrat',
-      fontSize: compact ? 14 : 15,
-      fontWeight: FontWeight.w700,
-    );
-    final valueStyle = textTheme.bodyLarge?.copyWith(
-      fontFamily: 'Montserrat',
-      fontSize: compact ? 13 : 14,
-      fontWeight: FontWeight.w600,
-      color: Colors.black54,
-    );
+    final title = appointment.title.trim().isEmpty
+        ? _consultationTypeLabel(appointment.consultationType)
+        : appointment.title.trim();
+    final hasDescription =
+        appointment.description != null && appointment.description!.trim().isNotEmpty;
 
-    return Material(
-      color: Colors.transparent,
+    return Container(
       child: InkWell(
-        onTap: onTap,
+        onTap: onEdit,
         child: Container(
           padding: EdgeInsets.symmetric(vertical: compact ? 6 : 8),
           decoration: const BoxDecoration(
@@ -337,10 +322,12 @@ class _AppointmentCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(DateFormat('d MMM', 'fr_FR').format(appointment.startTime), style: textTheme.bodySmall),
+                    Text(DateFormat('d MMM', 'fr_FR').format(appointment.startTime), style: textTheme.bodyMedium),
                     const SizedBox(height: 2),
-                    Text('${DateFormat('HH:mm').format(appointment.startTime)}', style: textTheme.bodySmall?.copyWith(color: Colors.black54)),
-                    Text('${DateFormat('HH:mm').format(appointment.endTime)}', style: textTheme.bodySmall?.copyWith(color: Colors.black54)),
+                    Text(
+                      '${DateFormat('HH:mm').format(appointment.startTime)} - ${DateFormat('HH:mm').format(appointment.endTime)}',
+                      style: textTheme.bodySmall?.copyWith(color: Colors.black54),
+                    ),
                   ],
                 ),
               ),
@@ -349,19 +336,35 @@ class _AppointmentCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Rendez-vous', style: titleStyle),
-                    const SizedBox(height: 6),
-                    Text(_consultationTypeLabel(appointment.consultationType), style: consultationStyle),
-                    const SizedBox(height: 6),
-                    Text('Lieu', style: labelStyle),
-                    Text(appointment.location ?? '-', style: valueStyle),
-                    const SizedBox(height: 4),
-                    Text('Description', style: labelStyle),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: compact ? textTheme.bodyMedium : textTheme.bodyLarge,
+                      ),
+                    ),
+                  ],
+                ),
+                    const SizedBox(height: 2),
                     Text(
-                      (appointment.description == null || appointment.description!.trim().isEmpty)
-                          ? 'Pas de description'
-                          : appointment.description!,
-                      style: valueStyle,
+                      'Type de consultation',
+                      style: compact ? textTheme.bodyMedium : textTheme.bodyLarge,
+                    ),
+                    Text(
+                      appointment.consultationType == null || appointment.consultationType!.trim().isEmpty
+                          ? 'Non renseigne'
+                          : _consultationTypeLabel(appointment.consultationType),
+                      style: textTheme.bodyMedium?.copyWith(color: Colors.black54),
+                    ),
+                    const SizedBox(height: 3),
+                    Text('Lieu', style: compact ? textTheme.bodyMedium : textTheme.bodyLarge),
+                    Text(appointment.location ?? '-', style: textTheme.bodyMedium?.copyWith(color: Colors.black54)),
+                    const SizedBox(height: 2),
+                    Text('Description', style: compact ? textTheme.bodyMedium : textTheme.bodyLarge),
+                    Text(
+                      hasDescription ? appointment.description! : 'Pas de description',
+                      style: textTheme.bodyMedium?.copyWith(color: Colors.black54),
                     ),
                   ],
                 ),
@@ -373,4 +376,3 @@ class _AppointmentCard extends StatelessWidget {
     );
   }
 }
-

@@ -1,8 +1,8 @@
 ﻿import 'package:flutter/material.dart';
 
-import '../../models/document_model.dart';
-import '../../theme/app_theme.dart';
-import '../../viewmodels/document_view_model.dart';
+import 'package:frontend_cebmed/models/document_model.dart';
+import 'package:frontend_cebmed/theme/app_theme.dart';
+import 'package:frontend_cebmed/viewmodels/document_view_model.dart';
 
 class DocumentView extends StatefulWidget {
   const DocumentView({super.key});
@@ -37,6 +37,52 @@ class _DocumentViewState extends State<DocumentView> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(result.message)),
+    );
+  }
+
+  Future<void> _startUploadFlow(Future<PendingDocumentUpload?> future) async {
+    final pending = await future;
+    if (!mounted || pending == null) {
+      return;
+    }
+
+    final nameController = TextEditingController(text: pending.suggestedName);
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Nom du document'),
+          content: TextField(
+            controller: nameController,
+            decoration: const InputDecoration(
+              labelText: 'Nom',
+              hintText: 'Ex: Ordonnance cardiologue',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Annuler'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Enregistrer'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) {
+      return;
+    }
+
+    await _runAction(
+      _viewModel.confirmUpload(
+        pending: pending,
+        chosenName: nameController.text,
+      ),
     );
   }
 
@@ -159,9 +205,11 @@ class _DocumentViewState extends State<DocumentView> {
                 Expanded(
                   child: RefreshIndicator(
                     onRefresh: _viewModel.loadDocuments,
-                    child: ListView(
-                      padding: const EdgeInsets.all(16),
-                      children: [
+                    child: Scrollbar(
+                      thumbVisibility: true,
+                      child: ListView(
+                        padding: const EdgeInsets.all(16),
+                        children: [
                         Text('Nouvelle ordonnance ?', style: textTheme.titleLarge),
                         const SizedBox(height: 8),
                         Text(
@@ -183,7 +231,7 @@ class _DocumentViewState extends State<DocumentView> {
                                 subtitle: 'Camera téléphone',
                                 onTap: _viewModel.isUploading
                                     ? null
-                                    : () => _runAction(_viewModel.scanDocument()),
+                                    : () => _startUploadFlow(_viewModel.scanDocument()),
                               ),
                               const SizedBox(height: 10),
                               _actionCard(
@@ -192,7 +240,7 @@ class _DocumentViewState extends State<DocumentView> {
                                 subtitle: 'PDF, JPG ou PNG (Max 10 Mo)',
                                 onTap: _viewModel.isUploading
                                     ? null
-                                    : () => _runAction(_viewModel.importDocument()),
+                                    : () => _startUploadFlow(_viewModel.importDocument()),
                               ),
                             ],
                           ),
@@ -269,13 +317,16 @@ class _DocumentViewState extends State<DocumentView> {
                                 ),
                                 trailing: PopupMenuButton<String>(
                                   onSelected: (value) {
-                                    if (value == 'edit') {
+                                    if (value == 'share') {
+                                      _runAction(_viewModel.shareDocument(doc));
+                                    } else if (value == 'edit') {
                                       _editDocument(doc);
                                     } else if (value == 'delete') {
                                       _deleteDocument(doc);
                                     }
                                   },
                                   itemBuilder: (context) => const [
+                                    PopupMenuItem(value: 'share', child: Text('Partager')),
                                     PopupMenuItem(value: 'edit', child: Text('Modifier')),
                                     PopupMenuItem(value: 'delete', child: Text('Supprimer')),
                                   ],
@@ -283,7 +334,8 @@ class _DocumentViewState extends State<DocumentView> {
                               ),
                             );
                           }),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -339,3 +391,4 @@ class _DocumentViewState extends State<DocumentView> {
     );
   }
 }
+

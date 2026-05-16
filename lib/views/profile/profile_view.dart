@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 class ProfileView extends StatelessWidget {
   const ProfileView({
@@ -13,7 +13,7 @@ class ProfileView extends StatelessWidget {
     return Center(
       child: FilledButton(
         onPressed: onLogout,
-        child: const Text('Déconnexion'),
+        child: const Text('DÃ©connexion'),
       ),
     );
   }

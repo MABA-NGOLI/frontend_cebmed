@@ -84,7 +84,7 @@ class ApiService {
       );
     }
 
-    token = data['token'] as String?;
+    token = (data['token'] ?? data['access_token']) as String?;
 
     if (token == null || token!.isEmpty) {
       token = null;

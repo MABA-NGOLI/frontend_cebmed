@@ -81,11 +81,12 @@ class SignupViewModel extends ChangeNotifier {
   }
 
   bool _isStrongPassword(String password) {
-    final regex = RegExp(
-      r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&.#_\-])[A-Za-z\d@$!%*?&.#_\-]{8,}$',
-    );
-
-    return regex.hasMatch(password);
+    if (password.length < 8) return false;
+    if (!password.contains(RegExp(r'[a-z]'))) return false;
+    if (!password.contains(RegExp(r'[A-Z]'))) return false;
+    if (!password.contains(RegExp(r'\d'))) return false;
+    if (!password.contains(RegExp(r'[^a-zA-Z\d]'))) return false;
+    return true;
   }
 
   Future<bool> signup() async {

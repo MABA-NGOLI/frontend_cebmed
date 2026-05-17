@@ -56,7 +56,7 @@ class AuthContainer extends StatelessWidget {
   }
 }
 
-class AuthTextField extends StatelessWidget {
+class AuthTextField extends StatefulWidget {
   const AuthTextField({
     super.key,
     required this.controller,
@@ -79,17 +79,38 @@ class AuthTextField extends StatelessWidget {
   final Widget? suffixIcon;
 
   @override
+  State<AuthTextField> createState() => _AuthTextFieldState();
+}
+
+class _AuthTextFieldState extends State<AuthTextField> {
+  late bool _hidden;
+
+  @override
+  void initState() {
+    super.initState();
+    _hidden = widget.obscure;
+  }
+
+  @override
   Widget build(BuildContext context) {
     return TextField(
-      controller: controller,
-      onChanged: onChanged,
-      keyboardType: keyboardType,
-      obscureText: obscure,
-      readOnly: readOnly,
-      onTap: onTap,
+      controller: widget.controller,
+      onChanged: widget.onChanged,
+      keyboardType: widget.keyboardType,
+      obscureText: _hidden,
+      readOnly: widget.readOnly,
+      onTap: widget.onTap,
       decoration: InputDecoration(
-        hintText: hint,
-        suffixIcon: suffixIcon,
+        hintText: widget.hint,
+        suffixIcon: widget.obscure
+            ? IconButton(
+                icon: Icon(
+                  _hidden ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                  color: Colors.black45,
+                ),
+                onPressed: () => setState(() => _hidden = !_hidden),
+              )
+            : widget.suffixIcon,
         filled: true,
         fillColor: const Color(0xFFEAEAEA),
         border: OutlineInputBorder(

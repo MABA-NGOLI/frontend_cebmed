@@ -123,6 +123,7 @@ class ApiService {
     _accessToken = data['access_token'] as String?;
     _refreshToken = data['refresh_token'] as String?;
 
+
     if (_accessToken == null || _accessToken!.isEmpty) {
       clearTokens();
       throw Exception('Token absent, connexion impossible');
@@ -141,7 +142,59 @@ class ApiService {
       throw Exception('Erreur profil (HTTP ${response.statusCode}): ${response.body}');
     }
 
-    return MeResponse.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    if (body['user'] is Map<String, dynamic>) {
+      return MeResponse.fromJson(body);
+    }
+    return MeResponse.fromJson({'user': body});
+  }
+
+  static Future<MeResponse> updateMe({
+    String? firstName,
+    String? lastName,
+    String? phone,
+    String? picture,
+  }) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/auth/me'),
+      headers: headers(),
+      body: jsonEncode({
+        if (firstName != null) 'first_name': firstName,
+        if (lastName != null) 'last_name': lastName,
+        if (phone != null) 'phone': phone,
+        if (picture != null) 'picture': picture,
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Erreur mise a jour profil (HTTP ${response.statusCode}): ${response.body}',
+      );
+    }
+
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    if (body['user'] is Map<String, dynamic>) {
+      return MeResponse.fromJson(body);
+    }
+    return MeResponse.fromJson({'user': body});
+  }
+
+  static Future<void> deleteMyAccount({
+    required String password,
+  }) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/auth/me'),
+      headers: headers(),
+      body: jsonEncode({'password': password}),
+    );
+
+    if (response.statusCode != 200 && response.statusCode != 204) {
+      throw Exception(
+        'Suppression impossible (HTTP ${response.statusCode}): ${response.body}',
+      );
+    }
+
+    clearTokens();
   }
 
   static Future<String> createCaregiverInviteCode() async {

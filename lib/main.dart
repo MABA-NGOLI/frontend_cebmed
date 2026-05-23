@@ -1,8 +1,9 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'theme/app_theme.dart';
+import 'services/notification_service.dart';
 import 'views/authentication/login_view.dart';
 import 'views/authentication/role_selection_view.dart';
 import 'views/authentication/signup_view.dart';
@@ -22,6 +23,7 @@ enum EntryStage {
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('fr_FR');
+  await NotificationService.init();
   runApp(const CebMedApp());
 }
 
@@ -107,7 +109,7 @@ class _CebMedAppState extends State<CebMedApp> {
 
       case EntryStage.roleSelection:
         home = RoleSelectionView(
-          onSelectRole: (role) {
+          onSelectRole: (_) {
             setState(() {
               stage = EntryStage.app;
             });

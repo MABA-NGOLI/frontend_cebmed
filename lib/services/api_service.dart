@@ -84,7 +84,7 @@ class ApiService {
       );
     }
 
-    token = data['token'] as String?;
+    token = (data['token'] ?? data['access_token']) as String?;
 
     if (token == null || token!.isEmpty) {
       token = null;
@@ -104,7 +104,37 @@ class ApiService {
       throw Exception('Erreur profil (HTTP ${response.statusCode}): ${response.body}');
     }
 
-    return MeResponse.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    if (body['user'] is Map<String, dynamic>) {
+      return MeResponse.fromJson(body);
+    }
+    return MeResponse.fromJson({'user': body});
+  }
+
+  static Future<MeResponse> updateMe({
+    String? phone,
+    String? picture,
+  }) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/auth/me'),
+      headers: headers(),
+      body: jsonEncode({
+        if (phone != null) 'phone': phone,
+        if (picture != null) 'picture': picture,
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Erreur mise a jour profil (HTTP ${response.statusCode}): ${response.body}',
+      );
+    }
+
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    if (body['user'] is Map<String, dynamic>) {
+      return MeResponse.fromJson(body);
+    }
+    return MeResponse.fromJson({'user': body});
   }
 
   static Future<String> createCaregiverInviteCode() async {

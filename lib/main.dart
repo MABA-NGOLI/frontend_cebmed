@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
@@ -107,7 +107,7 @@ class _CebMedAppState extends State<CebMedApp> {
 
       case EntryStage.roleSelection:
         home = RoleSelectionView(
-          onSelectRole: (role) {
+          onSelectRole: (_) {
             setState(() {
               stage = EntryStage.app;
             });

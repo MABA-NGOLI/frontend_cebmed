@@ -1,5 +1,6 @@
 ﻿import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/appointment.dart';
@@ -10,62 +11,24 @@ class ApiService {
   static final String baseUrl = _resolveBaseUrl();
 
   static String _resolveBaseUrl() {
+    if (kIsWeb) {
+      return 'http://localhost:3000/api';
+    }
 
-    // if (kIsWeb) {
-    //   return 'http://localhost:3000/api';
-    // }
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return 'http://10.0.2.2:3000/api';
+    }
 
-    // if (defaultTargetPlatform == TargetPlatform.android) {
-    //   return 'http://10.0.2.2:3000/api';
-    // }
-
-    // return 'http://localhost:3000/api';
-    return 'http://31.207.35.91/cebmed/api';
+    return 'http://localhost:3000/api';
   }
 
-  static String? _accessToken;
-  static String? _refreshToken;
+  static String? token;
 
   static Map<String, String> headers() {
     return {
       'Content-Type': 'application/json',
-      if (_accessToken != null) 'Authorization': 'Bearer $_accessToken',
+      ...?(token == null ? null : {'Authorization': 'Bearer $token'}),
     };
-  }
-
-  // Exécute une requête et relance automatiquement après refresh si 401.
-  static Future<http.Response> _execute(Future<http.Response> Function() call) async {
-    final response = await call();
-    if (response.statusCode == 401 && _refreshToken != null) {
-      await refresh();
-      return call();
-    }
-    return response;
-  }
-
-  static Future<void> refresh() async {
-    if (_refreshToken == null) throw Exception('Session expirée, veuillez vous reconnecter');
-
-    final response = await http.post(
-      Uri.parse('$baseUrl/refresh'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'refresh_token': _refreshToken}),
-    );
-
-    if (response.statusCode != 200) {
-      _accessToken = null;
-      _refreshToken = null;
-      throw Exception('Session expirée, veuillez vous reconnecter');
-    }
-
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
-    _accessToken = data['access_token'] as String?;
-    _refreshToken = data['refresh_token'] as String?;
-  }
-
-  static void clearTokens() {
-    _accessToken = null;
-    _refreshToken = null;
   }
 
   static Future<Map<String, dynamic>> register({
@@ -102,7 +65,7 @@ class ApiService {
     required String email,
     required String password,
   }) async {
-    clearTokens();
+    token = null;
     final response = await http.post(
       Uri.parse('$baseUrl/auth/login'),
       headers: headers(),
@@ -115,17 +78,16 @@ class ApiService {
     final data = jsonDecode(response.body) as Map<String, dynamic>;
 
     if (response.statusCode != 200) {
+      token = null;
       throw Exception(
         (data['message'] ?? 'Email ou mot de passe incorrect').toString(),
       );
     }
 
-    _accessToken = data['access_token'] as String?;
-    _refreshToken = data['refresh_token'] as String?;
+    token = (data['token'] ?? data['access_token']) as String?;
 
-
-    if (_accessToken == null || _accessToken!.isEmpty) {
-      clearTokens();
+    if (token == null || token!.isEmpty) {
+      token = null;
       throw Exception('Token absent, connexion impossible');
     }
 
@@ -133,10 +95,10 @@ class ApiService {
   }
 
   static Future<MeResponse> getMe() async {
-    final response = await _execute(() => http.get(
+    final response = await http.get(
       Uri.parse('$baseUrl/auth/me'),
       headers: headers(),
-    ));
+    );
 
     if (response.statusCode != 200) {
       throw Exception('Erreur profil (HTTP ${response.statusCode}): ${response.body}');
@@ -150,8 +112,6 @@ class ApiService {
   }
 
   static Future<MeResponse> updateMe({
-    String? firstName,
-    String? lastName,
     String? phone,
     String? picture,
   }) async {
@@ -159,8 +119,6 @@ class ApiService {
       Uri.parse('$baseUrl/auth/me'),
       headers: headers(),
       body: jsonEncode({
-        if (firstName != null) 'first_name': firstName,
-        if (lastName != null) 'last_name': lastName,
         if (phone != null) 'phone': phone,
         if (picture != null) 'picture': picture,
       }),
@@ -179,29 +137,11 @@ class ApiService {
     return MeResponse.fromJson({'user': body});
   }
 
-  static Future<void> deleteMyAccount({
-    required String password,
-  }) async {
-    final response = await http.delete(
-      Uri.parse('$baseUrl/auth/me'),
-      headers: headers(),
-      body: jsonEncode({'password': password}),
-    );
-
-    if (response.statusCode != 200 && response.statusCode != 204) {
-      throw Exception(
-        'Suppression impossible (HTTP ${response.statusCode}): ${response.body}',
-      );
-    }
-
-    clearTokens();
-  }
-
   static Future<String> createCaregiverInviteCode() async {
-    final response = await _execute(() => http.post(
+    final response = await http.post(
       Uri.parse('$baseUrl/caregiver-invites'),
       headers: headers(),
-    ));
+    );
 
     if (response.statusCode != 201 && response.statusCode != 200) {
       throw Exception('Erreur code de partage (HTTP ${response.statusCode}): ${response.body}');
@@ -229,10 +169,10 @@ class ApiService {
   }
 
   static Future<List<Appointment>> getAppointments() async {
-    final response = await _execute(() => http.get(
+    final response = await http.get(
       Uri.parse('$baseUrl/appointments'),
       headers: headers(),
-    ));
+    );
 
     if (response.statusCode != 200) {
       throw Exception(
@@ -256,7 +196,7 @@ class ApiService {
     String? consultationType,
     int? reminderDelay,
   }) async {
-    final response = await _execute(() => http.post(
+    final response = await http.post(
       Uri.parse('$baseUrl/appointments'),
       headers: headers(),
       body: jsonEncode({
@@ -270,7 +210,7 @@ class ApiService {
         'consultationType': consultationType,
         'reminder_delay': reminderDelay,
       }),
-    ));
+    );
 
     if (response.statusCode != 201) {
       throw Exception(
@@ -282,10 +222,10 @@ class ApiService {
   }
 
   static Future<void> deleteAppointment(int id) async {
-    final response = await _execute(() => http.delete(
+    final response = await http.delete(
       Uri.parse('$baseUrl/appointments/$id'),
       headers: headers(),
-    ));
+    );
 
     if (response.statusCode != 204) {
       throw Exception(
@@ -305,7 +245,7 @@ class ApiService {
     String? consultationType,
     int? reminderDelay,
   }) async {
-    final response = await _execute(() => http.put(
+    final response = await http.put(
       Uri.parse('$baseUrl/appointments/$id'),
       headers: headers(),
       body: jsonEncode({
@@ -319,7 +259,7 @@ class ApiService {
         'consultationType': consultationType,
         if (reminderDelay != null) 'reminder_delay': reminderDelay,
       }),
-    ));
+    );
 
     if (response.statusCode != 200) {
       throw Exception(
@@ -331,10 +271,10 @@ class ApiService {
   }
 
   static Future<List<DocumentModel>> getDocuments() async {
-    final response = await _execute(() => http.get(
+    final response = await http.get(
       Uri.parse('$baseUrl/documents'),
       headers: headers(),
-    ));
+    );
 
     if (response.statusCode != 200) {
       throw Exception(
@@ -355,7 +295,7 @@ class ApiService {
     required String fileName,
     required List<int> bytes,
   }) async {
-    final response = await _execute(() => http.post(
+    final response = await http.post(
       Uri.parse('$baseUrl/documents'),
       headers: headers(),
       body: jsonEncode({
@@ -365,7 +305,7 @@ class ApiService {
         'fileName': fileName,
         'contentBase64': base64Encode(bytes),
       }),
-    ));
+    );
 
     if (response.statusCode != 201) {
       throw Exception(
@@ -384,7 +324,7 @@ class ApiService {
     String? fileName,
     List<int>? bytes,
   }) async {
-    final response = await _execute(() => http.put(
+    final response = await http.put(
       Uri.parse('$baseUrl/documents/$id'),
       headers: headers(),
       body: jsonEncode({
@@ -394,7 +334,7 @@ class ApiService {
         if (fileName != null) 'fileName': fileName,
         if (bytes != null) 'contentBase64': base64Encode(bytes),
       }),
-    ));
+    );
 
     if (response.statusCode != 200) {
       throw Exception(
@@ -406,10 +346,10 @@ class ApiService {
   }
 
   static Future<void> deleteDocument(int id) async {
-    final response = await _execute(() => http.delete(
+    final response = await http.delete(
       Uri.parse('$baseUrl/documents/$id'),
       headers: headers(),
-    ));
+    );
 
     if (response.statusCode != 204) {
       throw Exception(

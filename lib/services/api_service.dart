@@ -1,10 +1,14 @@
 ﻿import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/appointment.dart';
 import '../models/auth_models.dart';
 import '../models/document_model.dart';
+import '../models/stock_model.dart';
+import '../models/treatment_model.dart';
 
 class ApiService {
   static final String baseUrl = _resolveBaseUrl();
@@ -26,6 +30,28 @@ class ApiService {
   static String? _accessToken;
   static String? _refreshToken;
 
+  static const String _kAccessToken = 'auth_access_token';
+  static const String _kRefreshToken = 'auth_refresh_token';
+
+  static Future<void> _saveTokens() async {
+    if (_accessToken == null || _refreshToken == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kAccessToken, _accessToken!);
+    await prefs.setString(_kRefreshToken, _refreshToken!);
+  }
+
+  static Future<bool> loadTokens() async {
+    final prefs = await SharedPreferences.getInstance();
+    final access = prefs.getString(_kAccessToken);
+    final refresh = prefs.getString(_kRefreshToken);
+    if (access != null && access.isNotEmpty && refresh != null && refresh.isNotEmpty) {
+      _accessToken = access;
+      _refreshToken = refresh;
+      return true;
+    }
+    return false;
+  }
+
   static Map<String, String> headers() {
     return {
       'Content-Type': 'application/json',
@@ -36,7 +62,7 @@ class ApiService {
   // Exécute une requête et relance automatiquement après refresh si 401.
   static Future<http.Response> _execute(Future<http.Response> Function() call) async {
     final response = await call();
-    if (response.statusCode == 401 && _refreshToken != null) {
+    if ((response.statusCode == 401 || response.statusCode == 403) && _refreshToken != null) {
       await refresh();
       return call();
     }
@@ -61,11 +87,16 @@ class ApiService {
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     _accessToken = data['access_token'] as String?;
     _refreshToken = data['refresh_token'] as String?;
+    await _saveTokens();
   }
 
   static void clearTokens() {
     _accessToken = null;
     _refreshToken = null;
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.remove(_kAccessToken);
+      prefs.remove(_kRefreshToken);
+    });
   }
 
   static Future<Map<String, dynamic>> register({
@@ -129,6 +160,7 @@ class ApiService {
       throw Exception('Token absent, connexion impossible');
     }
 
+    await _saveTokens();
     return data;
   }
 
@@ -416,6 +448,255 @@ class ApiService {
         'Erreur suppression document (HTTP ${response.statusCode}): ${response.body}',
       );
     }
+  }
+
+  static Future<void> deleteStock(int id) async {
+    final response = await _execute(() => http.delete(
+      Uri.parse('$baseUrl/stock/$id'),
+      headers: headers(),
+    ));
+
+    if (response.statusCode != 204 && response.statusCode != 200) {
+      throw Exception(
+        'Erreur suppression stock (HTTP ${response.statusCode}): ${response.body}',
+      );
+    }
+  }
+
+  static Future<void> deleteTreatment(int id) async {
+    final response = await _execute(() => http.delete(
+      Uri.parse('$baseUrl/treatment/$id'),
+      headers: headers(),
+    ));
+
+    if (response.statusCode != 204 && response.statusCode != 200) {
+      throw Exception(
+        'Erreur suppression traitement (HTTP ${response.statusCode}): ${response.body}',
+      );
+    }
+  }
+
+  static Future<void> addStock({required int id, required int amount}) async {
+    final response = await _execute(() => http.patch(
+      Uri.parse('$baseUrl/stock/$id/add'),
+      headers: headers(),
+      body: jsonEncode({'amount': amount}),
+    ));
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Erreur ajout stock (HTTP ${response.statusCode}): ${response.body}',
+      );
+    }
+  }
+
+  static Future<void> removeStock({required int id, required int amount}) async {
+    final response = await _execute(() => http.patch(
+      Uri.parse('$baseUrl/stock/$id/remove'),
+      headers: headers(),
+      body: jsonEncode({'amount': amount}),
+    ));
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Erreur retrait stock (HTTP ${response.statusCode}): ${response.body}',
+      );
+    }
+  }
+
+  static Future<void> updateStock({
+    required int id,
+    int? quantity,
+    String? location,
+  }) async {
+    final response = await _execute(() => http.patch(
+      Uri.parse('$baseUrl/stock/$id'),
+      headers: headers(),
+      body: jsonEncode({
+        if (quantity != null) 'quantity': quantity,
+        if (location != null) 'location': location,
+      }),
+    ));
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Erreur mise à jour stock (HTTP ${response.statusCode}): ${response.body}',
+      );
+    }
+  }
+
+  static Future<List<MedicationSearchResult>> searchMedications(String name) async {
+    final uri = Uri.parse('$baseUrl/medication/nameSearch')
+        .replace(queryParameters: {'name': name});
+    final response = await _execute(() => http.get(uri, headers: headers()));
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Erreur recherche médicament (HTTP ${response.statusCode}): ${response.body}',
+      );
+    }
+
+    final body = jsonDecode(response.body);
+    final List<dynamic> data;
+    if (body is List) {
+      data = body;
+    } else if (body is Map<String, dynamic>) {
+      data = (body['data'] ?? body['results'] ?? const []) as List<dynamic>;
+    } else {
+      data = const [];
+    }
+
+    return data
+        .map((e) => MedicationSearchResult.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  static Future<void> createStock({
+    required int medicationId,
+    required int quantity,
+    required String location,
+  }) async {
+    final response = await _execute(() => http.post(
+      Uri.parse('$baseUrl/stock/new'),
+      headers: headers(),
+      body: jsonEncode({
+        'medication_id': medicationId,
+        'quantity': quantity,
+        'location': location,
+      }),
+    ));
+
+    if (response.statusCode != 201 && response.statusCode != 200) {
+      throw Exception(
+        'Erreur création stock (HTTP ${response.statusCode}): ${response.body}',
+      );
+    }
+  }
+
+  static Future<int> createTreatment({
+    required int medicationId,
+    required String frequency,
+    required List<int> daysOfWeek,
+    required String startDate,
+    String? endDate,
+  }) async {
+    final response = await _execute(() => http.post(
+      Uri.parse('$baseUrl/treatment/new'),
+      headers: headers(),
+      body: jsonEncode({
+        'medication_id': medicationId,
+        'dosage': '0',
+        'frequency': frequency,
+        'days_of_week': daysOfWeek,
+        'start_date': startDate,
+        if (endDate != null) 'end_date': endDate,
+      }),
+    ));
+
+    if (response.statusCode != 201 && response.statusCode != 200) {
+      throw Exception(
+        'Erreur création traitement (HTTP ${response.statusCode}): ${response.body}',
+      );
+    }
+
+    final data = jsonDecode(response.body);
+    if (data is Map<String, dynamic>) {
+      final id = data['id'] ?? (data['data'] is Map ? (data['data'] as Map)['id'] : null);
+      if (id != null) return (id as num).toInt();
+    }
+    throw Exception('ID traitement introuvable dans la réponse');
+  }
+
+  static Future<List<TreatmentItem>> getTreatments() async {
+    final response = await _execute(() => http.get(
+      Uri.parse('$baseUrl/treatment/me'),
+      headers: headers(),
+    ));
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Erreur chargement traitements (HTTP ${response.statusCode}): ${response.body}',
+      );
+    }
+
+    final body = jsonDecode(response.body);
+    final List<dynamic> data;
+    if (body is List) {
+      data = body;
+    } else if (body is Map<String, dynamic>) {
+      data = (body['data'] ?? body['treatments'] ?? const []) as List<dynamic>;
+    } else {
+      data = const [];
+    }
+
+    return data
+        .map((e) => TreatmentItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  static Future<List<TreatmentSchedule>> getTreatmentSchedules(int treatmentId) async {
+    final response = await _execute(() => http.get(
+      Uri.parse('$baseUrl/treatment/$treatmentId/schedules'),
+      headers: headers(),
+    ));
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Erreur chargement créneaux (HTTP ${response.statusCode}): ${response.body}',
+      );
+    }
+
+    final body = jsonDecode(response.body);
+    final List<dynamic> data;
+    if (body is List) {
+      data = body;
+    } else if (body is Map<String, dynamic>) {
+      data = (body['data'] ?? body['schedules'] ?? const []) as List<dynamic>;
+    } else {
+      data = const [];
+    }
+
+    return data
+        .map((e) => TreatmentSchedule.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  static Future<void> addTreatmentSchedule({
+    required int treatmentId,
+    required String timeOfDay,
+    required double quantity,
+  }) async {
+    final response = await _execute(() => http.post(
+      Uri.parse('$baseUrl/treatment/$treatmentId/schedules'),
+      headers: headers(),
+      body: jsonEncode({
+        'time_of_day': timeOfDay,
+        'quantity': quantity,
+      }),
+    ));
+
+    if (response.statusCode != 201 && response.statusCode != 200) {
+      throw Exception(
+        'Erreur ajout créneau (HTTP ${response.statusCode}): ${response.body}',
+      );
+    }
+  }
+
+  static Future<StockSummary> getStock() async {
+    final response = await _execute(() => http.get(
+      Uri.parse('$baseUrl/stock/me'),
+      headers: headers(),
+    ));
+
+    debugPrint('[Stock] status=${response.statusCode} body=${response.body}');
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Erreur chargement stock (HTTP ${response.statusCode}): ${response.body}',
+      );
+    }
+
+    return StockSummary.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
 
   static Future<List<int>> downloadDocument({

@@ -1,7 +1,10 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
+
+import '../../services/api_service.dart';
 
 enum SplashResult {
   welcome,
+  app,
 }
 
 class SplashView extends StatefulWidget {
@@ -24,13 +27,15 @@ class _SplashViewState extends State<SplashView> {
   }
 
   Future<void> _bootstrap() async {
-    await Future.delayed(
-      const Duration(seconds: 3),
-    );
+    final results = await Future.wait([
+      Future.delayed(const Duration(seconds: 3)),
+      ApiService.loadTokens(),
+    ]);
 
     if (!mounted) return;
 
-    widget.onResolved(SplashResult.welcome);
+    final hasTokens = results[1] as bool;
+    widget.onResolved(hasTokens ? SplashResult.app : SplashResult.welcome);
   }
 
   @override

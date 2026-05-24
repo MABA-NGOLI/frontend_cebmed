@@ -7,7 +7,7 @@ import 'services/notification_service.dart';
 import 'views/authentication/login_view.dart';
 import 'views/authentication/role_selection_view.dart';
 import 'views/authentication/signup_view.dart';
-import 'views/entry/splash_view.dart';
+import 'views/entry/splash_view.dart' show SplashResult, SplashView;
 import 'views/entry/welcome_view.dart';
 import 'views/main_shell.dart';
 
@@ -44,9 +44,11 @@ class _CebMedAppState extends State<CebMedApp> {
     switch (stage) {
       case EntryStage.splash:
         home = SplashView(
-          onResolved: (_) {
+          onResolved: (result) {
             setState(() {
-              stage = EntryStage.welcome;
+              stage = result == SplashResult.app
+                  ? EntryStage.app
+                  : EntryStage.welcome;
             });
           },
         );

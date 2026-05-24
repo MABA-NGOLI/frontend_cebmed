@@ -23,7 +23,13 @@ class _MainShellState extends State<MainShell> {
   late final List<Widget> _pages = [
     const HomeView(),
     const DocumentView(),
-    const AppointmentView(),
+    AppointmentView(
+      onOpenProfile: () {
+        setState(() {
+          _currentIndex = 3;
+        });
+      },
+    ),
     ProfileView(onLogout: widget.onLogout),
   ];
 

@@ -8,7 +8,12 @@ import '../../theme/app_theme.dart';
 import 'package:frontend_cebmed/views/agenda/appointment_form_view.dart';
 
 class AppointmentView extends StatefulWidget {
-  const AppointmentView({super.key});
+  const AppointmentView({
+    super.key,
+    this.onOpenProfile,
+  });
+
+  final VoidCallback? onOpenProfile;
 
   @override
   State<AppointmentView> createState() => _AppointmentViewState();
@@ -56,13 +61,18 @@ class _AppointmentViewState extends State<AppointmentView> {
   }
 
   Future<void> _editAppointment(Appointment appointment) async {
-    final updated = await Navigator.of(context).push<bool>(
+    final result = await Navigator.of(context).push<Object?>(
       MaterialPageRoute(
         builder: (_) => AppointmentFormView(initialAppointment: appointment),
       ),
     );
 
-    if (updated == true) {
+    if (result == 'open_profile') {
+      widget.onOpenProfile?.call();
+      return;
+    }
+
+    if (result == true) {
       await _loadAppointments();
     }
   }
@@ -174,10 +184,14 @@ class _AppointmentViewState extends State<AppointmentView> {
                                   padding: EdgeInsets.symmetric(horizontal: horizontal),
                                   child: OutlinedButton.icon(
                                     onPressed: () async {
-                                      final created = await Navigator.of(context).push<bool>(
+                                      final result = await Navigator.of(context).push<Object?>(
                                         MaterialPageRoute(builder: (_) => const AppointmentFormView()),
                                       );
-                                      if (created == true) _loadAppointments();
+                                      if (result == 'open_profile') {
+                                        widget.onOpenProfile?.call();
+                                        return;
+                                      }
+                                      if (result == true) _loadAppointments();
                                     },
                                     iconAlignment: IconAlignment.end,
                                     icon: const Icon(Icons.add, size: 18),

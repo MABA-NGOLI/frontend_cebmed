@@ -2,6 +2,7 @@
 
 import '../models/appointment.dart';
 import '../services/api_service.dart';
+import '../services/notification_service.dart';
 
 class AppointmentViewModel extends ChangeNotifier {
   AppointmentViewModel({Appointment? initialAppointment})
@@ -198,7 +199,7 @@ class AppointmentViewModel extends ChangeNotifier {
       }
 
       if (isEditing) {
-        await ApiService.updateAppointment(
+        final updated = await ApiService.updateAppointment(
           id: _editingAppointmentId!,
           title: titleController.text.trim(),
           description: descriptionController.text.trim().isEmpty
@@ -211,8 +212,9 @@ class AppointmentViewModel extends ChangeNotifier {
           consultationType: consultationType == 'NON_RENSEIGNE' ? null : consultationType,
           reminderDelay: _mapReminderDelayToMinutes(),
         );
+        await _syncReminderForAppointment(updated);
       } else {
-        await ApiService.createAppointment(
+        final created = await ApiService.createAppointment(
           title: titleController.text.trim(),
           description: descriptionController.text.trim().isEmpty
               ? null
@@ -224,6 +226,7 @@ class AppointmentViewModel extends ChangeNotifier {
           consultationType: consultationType == 'NON_RENSEIGNE' ? null : consultationType,
           reminderDelay: _mapReminderDelayToMinutes(),
         );
+        await _syncReminderForAppointment(created);
       }
 
       isSaving = false;
@@ -264,6 +267,7 @@ class AppointmentViewModel extends ChangeNotifier {
 
     try {
       await ApiService.deleteAppointment(_editingAppointmentId!);
+      await NotificationService.cancelAppointmentReminder(_editingAppointmentId!);
       isSaving = false;
       notifyListeners();
       return true;
@@ -281,5 +285,20 @@ class AppointmentViewModel extends ChangeNotifier {
     locationController.dispose();
     descriptionController.dispose();
     super.dispose();
+  }
+
+  Future<void> _syncReminderForAppointment(Appointment appointment) async {
+    if (!appointment.notificationsEnabled) {
+      await NotificationService.cancelAppointmentReminder(appointment.id);
+      return;
+    }
+    final delay = appointment.reminderDelay ?? _mapReminderDelayToMinutes();
+    await NotificationService.scheduleAppointmentReminder(
+      appointmentId: appointment.id,
+      title: appointment.title,
+      location: appointment.location,
+      startAt: appointment.startTime,
+      reminderDelayMinutes: delay,
+    );
   }
 }

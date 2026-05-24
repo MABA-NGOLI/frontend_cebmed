@@ -1,4 +1,5 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../models/appointment.dart';
 import '../../viewmodels/appointment_view_model.dart';
@@ -125,7 +126,7 @@ class _AppointmentFormViewState extends State<AppointmentFormView> {
                   if (_showReminder)
                     ReminderCard(
                       enabled: _viewModel.notificationsEnabled,
-                      onToggle: _viewModel.setNotificationsEnabled,
+                      onToggle: _handleReminderToggle,
                       options: _viewModel.reminderOptions,
                       selected: _viewModel.reminderDelayLabel,
                       onSelect: _viewModel.setReminderDelay,
@@ -165,6 +166,44 @@ class _AppointmentFormViewState extends State<AppointmentFormView> {
     );
   }
 
+  Future<void> _handleReminderToggle(bool value) async {
+    if (!value) {
+      _viewModel.setNotificationsEnabled(false);
+      return;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final globallyAllowed = prefs.getBool('notifications_enabled') ?? false;
+    if (globallyAllowed) {
+      _viewModel.setNotificationsEnabled(true);
+      return;
+    }
+
+    if (!mounted) return;
+    final goToProfile = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Notifications desactivees'),
+        content: const Text(
+          'Autorisez d abord les notifications dans Profil pour activer les rappels de rendez-vous.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Fermer'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Aller au profil'),
+          ),
+        ],
+      ),
+    );
+
+    if (goToProfile == true && mounted) {
+      Navigator.of(context).pop('open_profile');
+    }
+  }
   Future<void> _submit() async {
     final success = await _viewModel.saveAppointment();
     if (!mounted) return;
@@ -225,3 +264,4 @@ class _AppointmentFormViewState extends State<AppointmentFormView> {
     );
   }
 }
+

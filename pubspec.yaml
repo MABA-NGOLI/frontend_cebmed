@@ -22,6 +22,7 @@ dependencies:
   intl: ^0.20.2
   table_calendar: ^3.2.0
   flutter_local_notifications: ^21.0.0
+  permission_handler: ^11.3.1
   timezone: ^0.11.0
   syncfusion_flutter_pdfviewer: ^28.2.12
 
@@ -65,3 +66,4 @@ flutter:
          - asset: assets/fonts/Montserrat-ExtraBoldItalic.ttf
            weight: 800
            style: italic
+

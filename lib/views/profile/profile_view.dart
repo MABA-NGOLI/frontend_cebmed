@@ -2,6 +2,7 @@
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
@@ -221,9 +222,28 @@ class _ProfileViewState extends State<ProfileView> {
     final ok = await _viewModel.setNotificationsEnabled(value);
     if (!mounted) return;
     if (!ok && value) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_viewModel.errorMessage ?? 'Permission refusee')),
+      final openSettings = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Notifications desactivees'),
+          content: const Text(
+            'Pour activer les rappels, autorisez les notifications dans les parametres de l\'application.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Plus tard'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Ouvrir les parametres'),
+            ),
+          ],
+        ),
       );
+      if (openSettings == true) {
+        await openAppSettings();
+      }
     }
   }
 
@@ -464,7 +484,6 @@ class _ProfileViewState extends State<ProfileView> {
                           SwitchListTile(
                             contentPadding: EdgeInsets.zero,
                             title: const Text('Autoriser les notifications'),
-                            subtitle: const Text('Rappels rendez-vous et traitements'),
                             value: _viewModel.notificationsEnabled,
                             onChanged: _toggleNotifications,
                           ),
@@ -500,3 +519,5 @@ class _ProfileViewState extends State<ProfileView> {
     );
   }
 }
+
+

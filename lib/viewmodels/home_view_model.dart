@@ -74,11 +74,7 @@ class HomeViewModel extends ChangeNotifier {
   }
 
   Future<void> ensureFreshShareCode() async {
-    final regenerate = await _shouldRegenerateCode();
-    if (regenerate) {
-      await createShareCode();
-      return;
-    }
+    await createShareCode();
   }
 
   Future<void> loadAppointments() async {
@@ -104,7 +100,13 @@ class HomeViewModel extends ChangeNotifier {
     } catch (_) {}
   }
 
-  Future<void> createShareCode() async {
+  Future<void> createShareCode({bool force = false}) async {
+    if (!force) {
+      final regenerate = await _shouldRegenerateCode();
+      if (!regenerate && shareCode.trim().isNotEmpty && shareCode != '------') {
+        return;
+      }
+    }
     isGeneratingCode = true;
     notifyListeners();
 
@@ -113,7 +115,7 @@ class HomeViewModel extends ChangeNotifier {
       shareCode = code;
       await _cacheCode(code);
     } catch (_) {
-      shareCode = '------';
+      // Keep the last valid code if refresh fails.
     } finally {
       isGeneratingCode = false;
       notifyListeners();
@@ -123,7 +125,7 @@ class HomeViewModel extends ChangeNotifier {
   void _startAutoRefreshCode() {
     _refreshCodeTimer?.cancel();
     _refreshCodeTimer = Timer.periodic(_codeRefreshInterval, (_) {
-      createShareCode();
+      createShareCode(force: true);
     });
   }
 
@@ -179,4 +181,3 @@ class HomeViewModel extends ChangeNotifier {
     super.dispose();
   }
 }
-

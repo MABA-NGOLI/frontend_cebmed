@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'theme/app_theme.dart';
+import 'services/api_service.dart';
 import 'services/notification_service.dart';
 import 'views/authentication/login_view.dart';
 import 'views/authentication/role_selection_view.dart';
@@ -120,11 +121,13 @@ class _CebMedAppState extends State<CebMedApp> {
         break;
 
       case EntryStage.app:
+        ApiService.onSessionExpired = () {
+          if (mounted) setState(() => stage = EntryStage.welcome);
+        };
         home = MainShell(
           onLogout: () {
-            setState(() {
-              stage = EntryStage.welcome;
-            });
+            ApiService.onSessionExpired = null;
+            setState(() => stage = EntryStage.welcome);
           },
         );
         break;

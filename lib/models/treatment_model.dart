@@ -22,6 +22,7 @@ class TreatmentItem {
   const TreatmentItem({
     required this.id,
     required this.medicationId,
+    this.medicationName,
     required this.dosage,
     required this.frequency,
     required this.daysOfWeek,
@@ -32,6 +33,7 @@ class TreatmentItem {
 
   final int id;
   final int medicationId;
+  final String? medicationName;
   final String dosage;
   final String frequency;
   final List<int> daysOfWeek;
@@ -40,9 +42,16 @@ class TreatmentItem {
   final String status;
 
   factory TreatmentItem.fromJson(Map<String, dynamic> json) {
+    String? medicationName;
+    final med = json['medication'];
+    if (med is Map<String, dynamic>) {
+      medicationName = med['name'] as String?;
+    }
+
     return TreatmentItem(
       id: (json['id'] as num).toInt(),
       medicationId: (json['medication_id'] as num).toInt(),
+      medicationName: medicationName,
       dosage: json['dosage'] as String? ?? '',
       frequency: json['frequency'] as String? ?? '',
       daysOfWeek: (json['days_of_week'] as List<dynamic>?)

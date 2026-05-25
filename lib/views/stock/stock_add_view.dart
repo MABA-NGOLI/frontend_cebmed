@@ -155,7 +155,7 @@ class _StockAddViewState extends State<StockAddView> {
                       Text('Sélection & Période', style: textTheme.titleLarge),
                       const SizedBox(height: 6),
                       Text(
-                        'Configurez les détails de base de votre nouveau traitement.',
+                        'Commencez par sélectionner le médicament à ajouter. Vous pourrez ensuite renseigner les détails du stock et, si c\'est un traitement, les horaires de prise.',
                         style: textTheme.bodyMedium?.copyWith(color: Colors.black54),
                       ),
                       const SizedBox(height: 24),

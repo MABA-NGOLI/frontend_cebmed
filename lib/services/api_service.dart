@@ -73,7 +73,7 @@ class ApiService {
     if (_refreshToken == null) throw Exception('Session expirée, veuillez vous reconnecter');
 
     final response = await http.post(
-      Uri.parse('$baseUrl/refresh'),
+      Uri.parse('$baseUrl/auth/refresh'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'refresh_token': _refreshToken}),
     );

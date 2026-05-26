@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/appointment.dart';
 import '../models/auth_models.dart';
 import '../models/document_model.dart';
+import '../models/intake_model.dart';
 import '../models/stock_model.dart';
 import '../models/treatment_model.dart';
 
@@ -29,6 +30,9 @@ class ApiService {
 
   static String? _accessToken;
   static String? _refreshToken;
+
+  /// Appelé quand le refresh token est expiré/invalide → rediriger vers le login.
+  static VoidCallback? onSessionExpired;
 
   static const String _kAccessToken = 'auth_access_token';
   static const String _kRefreshToken = 'auth_refresh_token';
@@ -70,7 +74,10 @@ class ApiService {
   }
 
   static Future<void> refresh() async {
-    if (_refreshToken == null) throw Exception('Session expirée, veuillez vous reconnecter');
+    if (_refreshToken == null) {
+      onSessionExpired?.call();
+      throw Exception('Session expirée, veuillez vous reconnecter');
+    }
 
     final response = await http.post(
       Uri.parse('$baseUrl/auth/refresh'),
@@ -81,6 +88,8 @@ class ApiService {
     if (response.statusCode != 200) {
       _accessToken = null;
       _refreshToken = null;
+      await clearTokensPersisted();
+      onSessionExpired?.call();
       throw Exception('Session expirée, veuillez vous reconnecter');
     }
 
@@ -97,6 +106,14 @@ class ApiService {
       prefs.remove(_kAccessToken);
       prefs.remove(_kRefreshToken);
     });
+  }
+
+  static Future<void> clearTokensPersisted() async {
+    _accessToken = null;
+    _refreshToken = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_kAccessToken);
+    await prefs.remove(_kRefreshToken);
   }
 
   static Future<Map<String, dynamic>> register({
@@ -737,5 +754,48 @@ class ApiService {
     }
 
     throw Exception('Téléchargement document impossible: $lastError');
+  }
+
+  static Future<List<IntakeItem>> getIntakesForTreatment(int treatmentId) async {
+    final response = await _execute(() => http.get(
+      Uri.parse('$baseUrl/intake/treatment/$treatmentId'),
+      headers: headers(),
+    ));
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Erreur chargement intakes (HTTP ${response.statusCode}): ${response.body}',
+      );
+    }
+
+    final body = jsonDecode(response.body);
+    debugPrint('[API] intake/$treatmentId body type=${body.runtimeType} preview=${response.body.substring(0, response.body.length.clamp(0, 120))}');
+    final List<dynamic> data;
+    if (body is List) {
+      data = body;
+    } else if (body is Map<String, dynamic>) {
+      final raw = body['data'] ?? body['intakes'] ?? body['items'] ?? const [];
+      data = raw is List ? raw : const [];
+    } else {
+      data = const [];
+    }
+    debugPrint('[API] intake/$treatmentId → ${data.length} item(s) parsé(s)');
+
+    return data
+        .map((e) => IntakeItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  static Future<void> validateIntake(int intakeId) async {
+    final response = await _execute(() => http.patch(
+      Uri.parse('$baseUrl/intake/$intakeId/validate'),
+      headers: headers(),
+    ));
+
+    if (response.statusCode != 200 && response.statusCode != 204) {
+      throw Exception(
+        'Erreur validation intake (HTTP ${response.statusCode}): ${response.body}',
+      );
+    }
   }
 }

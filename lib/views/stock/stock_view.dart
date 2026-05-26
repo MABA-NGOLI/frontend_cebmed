@@ -57,7 +57,7 @@ class _StockViewState extends State<StockView> {
                       const SizedBox(width: 28),
                       Expanded(
                         child: Text(
-                          'Mon stock',
+                          'Mes médicaments',
                           textAlign: TextAlign.center,
                           style: textTheme.titleLarge,
                         ),

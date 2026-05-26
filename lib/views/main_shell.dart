@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import 'package:frontend_cebmed/views/home/home_view.dart';
 import 'package:frontend_cebmed/views/agenda/appointment_view.dart';
@@ -71,4 +71,3 @@ class _MainShellState extends State<MainShell> {
     );
   }
 }
-

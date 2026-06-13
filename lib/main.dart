@@ -1,6 +1,8 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'theme/app_theme.dart';
 import 'services/api_service.dart';
@@ -11,6 +13,11 @@ import 'views/authentication/signup_view.dart';
 import 'views/entry/splash_view.dart' show SplashResult, SplashView;
 import 'views/entry/welcome_view.dart';
 import 'views/main_shell.dart';
+
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+}
 
 enum EntryStage {
   splash,
@@ -23,6 +30,9 @@ enum EntryStage {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+  debugPrint('[Main] Firebase apps after init: ${Firebase.apps.map((a) => a.name).toList()}');
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   await initializeDateFormatting('fr_FR');
   await NotificationService.init();
   runApp(const CebMedApp());

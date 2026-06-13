@@ -1,5 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 
+import '../../services/notification_service.dart';
 import '../../theme/app_theme.dart';
 import '../../viewmodels/signup_view_model.dart';
 import '../../widgets/auth/auth_widgets.dart';
@@ -42,6 +43,7 @@ class _SignupViewState extends State<SignupView> {
       return;
     }
     if (ok) {
+      NotificationService.syncFcmToken();
       widget.onSuccess();
     }
   }

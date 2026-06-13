@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "369690510449",
+    "project_id": "cebmed-1f9dc",
+    "storage_bucket": "cebmed-1f9dc.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:369690510449:android:4cc49cc49296824afa07d0",
+        "android_client_info": {
+          "package_name": "com.cebmed.frontend_cebmed"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyANUbmi2NPhSoGMz6CPtnfL0kJib12U8RA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

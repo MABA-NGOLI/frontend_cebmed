@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../services/api_service.dart';
+import '../../services/notification_service.dart';
 
 enum SplashResult {
   welcome,
@@ -35,6 +36,9 @@ class _SplashViewState extends State<SplashView> {
     if (!mounted) return;
 
     final hasTokens = results[1] as bool;
+    if (hasTokens) {
+      await NotificationService.syncFcmToken();
+    }
     widget.onResolved(hasTokens ? SplashResult.app : SplashResult.welcome);
   }
 

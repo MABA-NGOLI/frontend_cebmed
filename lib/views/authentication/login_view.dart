@@ -1,5 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 
+import '../../services/notification_service.dart';
 import '../../theme/app_theme.dart';
 import '../../viewmodels/login_view_model.dart';
 import '../../widgets/auth/auth_widgets.dart';
@@ -41,6 +42,7 @@ class _LoginViewState extends State<LoginView> {
       return;
     }
     if (ok) {
+      await NotificationService.syncFcmToken();
       widget.onSuccess();
     }
   }

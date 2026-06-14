@@ -4,6 +4,8 @@ import '../../services/notification_service.dart';
 import '../../theme/app_theme.dart';
 import '../../viewmodels/login_view_model.dart';
 import '../../widgets/auth/auth_widgets.dart';
+import 'email_verify_view.dart';
+import 'forgot_password_view.dart';
 
 class LoginView extends StatefulWidget {
   const LoginView({
@@ -38,12 +40,17 @@ class _LoginViewState extends State<LoginView> {
 
   Future<void> _submit() async {
     final ok = await _viewModel.login();
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
     if (ok) {
       await NotificationService.syncFcmToken();
       widget.onSuccess();
+    } else if (_viewModel.emailNotVerified && _viewModel.pendingEmail != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => EmailVerifyView(email: _viewModel.pendingEmail!),
+        ),
+      );
     }
   }
 
@@ -99,6 +106,15 @@ class _LoginViewState extends State<LoginView> {
                         onPressed: _viewModel.canSubmit ? _submit : null,
                       ),
                       const SizedBox(height: 10),
+                      Center(
+                        child: TextButton(
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const ForgotPasswordView()),
+                          ),
+                          child: const Text('Mot de passe oublié ?'),
+                        ),
+                      ),
                       Center(
                         child: TextButton(
                           onPressed: widget.onGoSignup,

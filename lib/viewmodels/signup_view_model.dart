@@ -130,14 +130,14 @@ class SignupViewModel extends ChangeNotifier {
         password: passwordController.text,
       );
 
-      await ApiService.login(
-        email: emailController.text.trim(),
-        password: passwordController.text,
-      );
-
       return true;
     } catch (e) {
-      errorMessage = 'Inscription échouée : $e';
+      final raw = e.toString().replaceFirst('Exception: ', '');
+      if (raw.contains('already exists') || raw.contains('409')) {
+        errorMessage = 'Un compte existe déjà avec cet email';
+      } else {
+        errorMessage = 'Inscription échouée : $raw';
+      }
       return false;
     } finally {
       isLoading = false;

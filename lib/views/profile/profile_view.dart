@@ -494,7 +494,10 @@ class _ProfileViewState extends State<ProfileView> {
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton(
-                        onPressed: widget.onLogout,
+                        onPressed: () async {
+                          await ApiService.logout();
+                          widget.onLogout();
+                        },
                         child: const Text('Deconnexion'),
                       ),
                     ),

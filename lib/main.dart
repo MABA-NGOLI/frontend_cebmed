@@ -45,8 +45,31 @@ class CebMedApp extends StatefulWidget {
   State<CebMedApp> createState() => _CebMedAppState();
 }
 
-class _CebMedAppState extends State<CebMedApp> {
+class _CebMedAppState extends State<CebMedApp> with WidgetsBindingObserver {
   EntryStage stage = EntryStage.splash;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && stage == EntryStage.app) {
+      ApiService.refreshIfNeeded().then((_) {
+        NotificationService.syncFcmToken();
+      }).catchError((_) {
+        // onSessionExpired gère déjà la redirection vers welcome
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

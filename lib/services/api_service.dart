@@ -1,4 +1,5 @@
-﻿import 'dart:convert';
+﻿import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -33,6 +34,9 @@ class ApiService {
 
   /// Appelé quand le refresh token est expiré/invalide → rediriger vers le login.
   static VoidCallback? onSessionExpired;
+
+  /// Verrou pour sérialiser les appels concurrents à refresh().
+  static Completer<void>? _refreshCompleter;
 
   static const String _kAccessToken = 'auth_access_token';
   static const String _kRefreshToken = 'auth_refresh_token';
@@ -74,29 +78,73 @@ class ApiService {
   }
 
   static Future<void> refresh() async {
+    // Si un refresh est déjà en cours, attendre sa complétion plutôt que d'en lancer un second
+    // (évite la race condition : rotation du refresh token invalidée par un appel concurrent).
+    if (_refreshCompleter != null) {
+      await _refreshCompleter!.future;
+      return;
+    }
+
     if (_refreshToken == null) {
       onSessionExpired?.call();
       throw Exception('Session expirée, veuillez vous reconnecter');
     }
 
-    final response = await http.post(
-      Uri.parse('$baseUrl/auth/refresh'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'refresh_token': _refreshToken}),
-    );
+    final completer = Completer<void>();
+    _refreshCompleter = completer;
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/refresh'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'refresh_token': _refreshToken}),
+      );
 
-    if (response.statusCode != 200) {
-      _accessToken = null;
-      _refreshToken = null;
-      await clearTokensPersisted();
-      onSessionExpired?.call();
-      throw Exception('Session expirée, veuillez vous reconnecter');
+      if (response.statusCode != 200) {
+        _accessToken = null;
+        _refreshToken = null;
+        await clearTokensPersisted();
+        onSessionExpired?.call();
+        final error = Exception('Session expirée, veuillez vous reconnecter');
+        completer.completeError(error);
+        throw error;
+      }
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      _accessToken = data['access_token'] as String?;
+      _refreshToken = data['refresh_token'] as String?;
+      await _saveTokens();
+      completer.complete();
+    } catch (e) {
+      if (!completer.isCompleted) completer.completeError(e);
+      rethrow;
+    } finally {
+      _refreshCompleter = null;
     }
+  }
 
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
-    _accessToken = data['access_token'] as String?;
-    _refreshToken = data['refresh_token'] as String?;
-    await _saveTokens();
+  /// Vérifie si l'access token est expiré ou expire dans moins de 2 minutes.
+  static bool _isAccessTokenExpiredOrExpiringSoon() {
+    if (_accessToken == null) return true;
+    try {
+      final parts = _accessToken!.split('.');
+      if (parts.length != 3) return true;
+      final padding = '=' * ((4 - parts[1].length % 4) % 4);
+      final payload = utf8.decode(base64Url.decode(parts[1] + padding));
+      final data = jsonDecode(payload) as Map<String, dynamic>;
+      final exp = data['exp'] as int?;
+      if (exp == null) return true;
+      final expiry = DateTime.fromMillisecondsSinceEpoch(exp * 1000);
+      return DateTime.now().isAfter(expiry.subtract(const Duration(minutes: 2)));
+    } catch (_) {
+      return true;
+    }
+  }
+
+  /// À appeler au retour au premier plan : rafraîchit le token si expiré ou proche de l'expiration.
+  static Future<void> refreshIfNeeded() async {
+    if (_isAccessTokenExpiredOrExpiringSoon()) {
+      await refresh();
+    }
   }
 
   static void clearTokens() {
@@ -161,6 +209,10 @@ class ApiService {
     );
 
     final data = jsonDecode(response.body) as Map<String, dynamic>;
+
+    if (response.statusCode == 403 && data['code'] == 'EMAIL_NOT_VERIFIED') {
+      throw Exception('EMAIL_NOT_VERIFIED');
+    }
 
     if (response.statusCode != 200) {
       throw Exception(
@@ -312,8 +364,8 @@ class ApiService {
         'title': title,
         'description': description,
         'location': location,
-        'start_time': startTime.toIso8601String(),
-        'end_time': endTime.toIso8601String(),
+        'start_time': startTime.toUtc().toIso8601String(),
+        'end_time': endTime.toUtc().toIso8601String(),
         'notifications_enabled': notificationsEnabled,
         'consultation_type': consultationType,
         'consultationType': consultationType,
@@ -361,8 +413,8 @@ class ApiService {
         if (title != null) 'title': title,
         if (description != null) 'description': description,
         if (location != null) 'location': location,
-        if (startTime != null) 'start_time': startTime.toIso8601String(),
-        if (endTime != null) 'end_time': endTime.toIso8601String(),
+        if (startTime != null) 'start_time': startTime.toUtc().toIso8601String(),
+        if (endTime != null) 'end_time': endTime.toUtc().toIso8601String(),
         if (notificationsEnabled != null) 'notifications_enabled': notificationsEnabled,
         'consultation_type': consultationType,
         'consultationType': consultationType,
@@ -784,6 +836,80 @@ class ApiService {
     return data
         .map((e) => IntakeItem.fromJson(e as Map<String, dynamic>))
         .toList();
+  }
+
+  static Future<void> logout() async {
+    if (_refreshToken == null) {
+      clearTokens();
+      return;
+    }
+    try {
+      await http.post(
+        Uri.parse('$baseUrl/auth/logout'),
+        headers: headers(),
+        body: jsonEncode({'refresh_token': _refreshToken}),
+      );
+    } catch (_) {
+      // On efface les tokens localement même si le backend est inaccessible
+    } finally {
+      clearTokens();
+    }
+  }
+
+  static Future<void> forgotPassword(String email) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/password/forgot'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email}),
+    );
+
+    if (response.statusCode != 200) {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      throw Exception((data['message'] ?? 'Erreur lors de l\'envoi').toString());
+    }
+  }
+
+  static Future<void> resetPassword({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/password/reset'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email, 'code': code, 'new_password': newPassword}),
+    );
+
+    if (response.statusCode != 200) {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      throw Exception((data['message'] ?? 'Erreur lors de la réinitialisation').toString());
+    }
+  }
+
+  static Future<void> verifyEmail({required String email, required String code}) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/verify-email'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email, 'code': code}),
+    );
+
+    if (response.statusCode != 200) {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      throw Exception((data['message'] ?? 'Code invalide').toString());
+    }
+  }
+
+  static Future<void> resendVerificationEmail(String email) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/resend-verification'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email}),
+    );
+
+    if (response.statusCode != 200) {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      throw Exception((data['message'] ?? 'Erreur lors de l\'envoi').toString());
+    }
   }
 
   static Future<void> validateIntake(int intakeId) async {

@@ -17,16 +17,16 @@ class ApiService {
   static final String baseUrl = _resolveBaseUrl();
 
   static String _resolveBaseUrl() {
-    if (kIsWeb) {
-      return 'http://localhost:3000/api';
-    }
+    // if (kIsWeb) {
+    //   return 'http://localhost:3000/api';
+    // }
 
-    if (defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:3000/api';
-    }
+    // if (defaultTargetPlatform == TargetPlatform.android) {
+    //   return 'http://10.0.2.2:3000/api';
+    // }
 
-    return 'http://localhost:3000/api';
-    //return 'http://31.207.35.91/cebmed/api';
+    // return 'http://localhost:3000/api';
+    return 'http://31.207.35.91/cebmed/api';
   }
 
   static String? _accessToken;

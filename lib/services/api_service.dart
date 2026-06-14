@@ -210,6 +210,10 @@ class ApiService {
 
     final data = jsonDecode(response.body) as Map<String, dynamic>;
 
+    if (response.statusCode == 403 && data['code'] == 'EMAIL_NOT_VERIFIED') {
+      throw Exception('EMAIL_NOT_VERIFIED');
+    }
+
     if (response.statusCode != 200) {
       throw Exception(
         (data['message'] ?? 'Email ou mot de passe incorrect').toString(),
@@ -832,6 +836,80 @@ class ApiService {
     return data
         .map((e) => IntakeItem.fromJson(e as Map<String, dynamic>))
         .toList();
+  }
+
+  static Future<void> logout() async {
+    if (_refreshToken == null) {
+      clearTokens();
+      return;
+    }
+    try {
+      await http.post(
+        Uri.parse('$baseUrl/auth/logout'),
+        headers: headers(),
+        body: jsonEncode({'refresh_token': _refreshToken}),
+      );
+    } catch (_) {
+      // On efface les tokens localement même si le backend est inaccessible
+    } finally {
+      clearTokens();
+    }
+  }
+
+  static Future<void> forgotPassword(String email) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/password/forgot'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email}),
+    );
+
+    if (response.statusCode != 200) {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      throw Exception((data['message'] ?? 'Erreur lors de l\'envoi').toString());
+    }
+  }
+
+  static Future<void> resetPassword({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/password/reset'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email, 'code': code, 'new_password': newPassword}),
+    );
+
+    if (response.statusCode != 200) {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      throw Exception((data['message'] ?? 'Erreur lors de la réinitialisation').toString());
+    }
+  }
+
+  static Future<void> verifyEmail({required String email, required String code}) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/verify-email'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email, 'code': code}),
+    );
+
+    if (response.statusCode != 200) {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      throw Exception((data['message'] ?? 'Code invalide').toString());
+    }
+  }
+
+  static Future<void> resendVerificationEmail(String email) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/resend-verification'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email}),
+    );
+
+    if (response.statusCode != 200) {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      throw Exception((data['message'] ?? 'Erreur lors de l\'envoi').toString());
+    }
   }
 
   static Future<void> validateIntake(int intakeId) async {

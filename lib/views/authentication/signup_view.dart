@@ -1,9 +1,9 @@
 ﻿import 'package:flutter/material.dart';
 
-import '../../services/notification_service.dart';
 import '../../theme/app_theme.dart';
 import '../../viewmodels/signup_view_model.dart';
 import '../../widgets/auth/auth_widgets.dart';
+import 'email_verify_view.dart';
 import 'legal_document_view.dart';
 
 class SignupView extends StatefulWidget {
@@ -39,12 +39,15 @@ class _SignupViewState extends State<SignupView> {
 
   Future<void> _submit() async {
     final ok = await _viewModel.signup();
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
     if (ok) {
-      NotificationService.syncFcmToken();
-      widget.onSuccess();
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => EmailVerifyView(email: _viewModel.emailController.text.trim()),
+        ),
+      );
+      if (mounted) widget.onGoLogin();
     }
   }
 
@@ -129,6 +132,8 @@ class _SignupViewState extends State<SignupView> {
                         obscure: true,
                         onChanged: (_) => _viewModel.onFieldChanged(),
                       ),
+                      const SizedBox(height: 8),
+                      _PasswordRules(password: _viewModel.passwordController.text),
                       const SizedBox(height: 10),
                       AuthTextField(
                         controller: _viewModel.confirmPasswordController,
@@ -167,6 +172,57 @@ class _SignupViewState extends State<SignupView> {
           ),
         );
       },
+    );
+  }
+}
+
+class _PasswordRules extends StatelessWidget {
+  const _PasswordRules({required this.password});
+
+  final String password;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _Rule(label: '8 caractères minimum', ok: password.length >= 8),
+        _Rule(label: 'Une majuscule', ok: password.contains(RegExp(r'[A-Z]'))),
+        _Rule(label: 'Une minuscule', ok: password.contains(RegExp(r'[a-z]'))),
+        _Rule(label: 'Un chiffre', ok: password.contains(RegExp(r'\d'))),
+        _Rule(label: 'Un caractère spécial', ok: password.contains(RegExp(r'[^a-zA-Z\d]'))),
+      ],
+    );
+  }
+}
+
+class _Rule extends StatelessWidget {
+  const _Rule({required this.label, required this.ok});
+
+  final String label;
+  final bool ok;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Icon(
+            ok ? Icons.check_circle : Icons.radio_button_unchecked,
+            size: 14,
+            color: ok ? Colors.green : Colors.black38,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: ok ? Colors.green : Colors.black45,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

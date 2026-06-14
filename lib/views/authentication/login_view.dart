@@ -10,11 +10,13 @@ class LoginView extends StatefulWidget {
     required this.onBack,
     required this.onSuccess,
     required this.onGoSignup,
+    required this.onForgotPassword,
   });
 
   final VoidCallback onBack;
   final VoidCallback onSuccess;
   final VoidCallback onGoSignup;
+  final VoidCallback onForgotPassword;
 
   @override
   State<LoginView> createState() => _LoginViewState();
@@ -85,6 +87,13 @@ class _LoginViewState extends State<LoginView> {
                         hint: 'Mot de passe',
                         obscure: true,
                         onChanged: (_) => _viewModel.onFieldChanged(),
+                      ),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: widget.onForgotPassword,
+                          child: const Text('Mot de passe oublié ?'),
+                        ),
                       ),
                       if (_viewModel.errorMessage != null) ...[
                         const SizedBox(height: 12),

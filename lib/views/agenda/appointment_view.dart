@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 
@@ -11,9 +11,11 @@ class AppointmentView extends StatefulWidget {
   const AppointmentView({
     super.key,
     this.onOpenProfile,
+    this.canEditAgenda = true,
   });
 
   final VoidCallback? onOpenProfile;
+  final bool canEditAgenda;
 
   @override
   State<AppointmentView> createState() => _AppointmentViewState();
@@ -61,6 +63,7 @@ class _AppointmentViewState extends State<AppointmentView> {
   }
 
   Future<void> _editAppointment(Appointment appointment) async {
+    if (!widget.canEditAgenda) return;
     final result = await Navigator.of(context).push<Object?>(
       MaterialPageRoute(
         builder: (_) => AppointmentFormView(initialAppointment: appointment),
@@ -105,43 +108,83 @@ class _AppointmentViewState extends State<AppointmentView> {
                           child: Column(
                             children: [
                               Container(
-                                margin: EdgeInsets.fromLTRB(horizontal, 10, horizontal, 0),
-                                padding: EdgeInsets.fromLTRB(horizontal, compact ? 14 : 18, horizontal, compact ? 10 : 14),
+                                margin: EdgeInsets.fromLTRB(
+                                  horizontal,
+                                  10,
+                                  horizontal,
+                                  0,
+                                ),
+                                padding: EdgeInsets.fromLTRB(
+                                  horizontal,
+                                  compact ? 14 : 18,
+                                  horizontal,
+                                  compact ? 10 : 14,
+                                ),
                                 decoration: BoxDecoration(
                                   color: AppTheme.primaryPink,
                                   borderRadius: BorderRadius.circular(18),
                                 ),
                                 child: Column(
                                   children: [
-                                    Text('Agenda', style: (compact ? textTheme.headlineSmall : textTheme.headlineMedium)?.copyWith(color: AppTheme.white)),
+                                    Text(
+                                      'Agenda',
+                                      style:
+                                          (compact
+                                                  ? textTheme.headlineSmall
+                                                  : textTheme.headlineMedium)
+                                              ?.copyWith(color: AppTheme.white),
+                                    ),
                                     SizedBox(height: compact ? 6 : 8),
                                     TableCalendar<Appointment>(
                                       locale: 'fr_FR',
                                       firstDay: DateTime(2020, 1, 1),
                                       lastDay: DateTime(2100, 12, 31),
                                       focusedDay: _focusedDay,
-                                      selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+                                      selectedDayPredicate: (day) =>
+                                          isSameDay(_selectedDay, day),
                                       eventLoader: _appointmentsForDay,
                                       headerStyle: HeaderStyle(
                                         formatButtonVisible: false,
                                         titleCentered: true,
-                                        leftChevronIcon: const Icon(Icons.chevron_left, color: AppTheme.white),
-                                        rightChevronIcon: const Icon(Icons.chevron_right, color: AppTheme.white),
-                                        titleTextStyle: (compact ? textTheme.titleMedium : textTheme.titleLarge)?.copyWith(color: AppTheme.white) ?? const TextStyle(color: AppTheme.white),
+                                        leftChevronIcon: const Icon(
+                                          Icons.chevron_left,
+                                          color: AppTheme.white,
+                                        ),
+                                        rightChevronIcon: const Icon(
+                                          Icons.chevron_right,
+                                          color: AppTheme.white,
+                                        ),
+                                        titleTextStyle:
+                                            (compact
+                                                    ? textTheme.titleMedium
+                                                    : textTheme.titleLarge)
+                                                ?.copyWith(
+                                                  color: AppTheme.white,
+                                                ) ??
+                                            const TextStyle(
+                                              color: AppTheme.white,
+                                            ),
                                       ),
                                       daysOfWeekStyle: const DaysOfWeekStyle(
-                                        weekdayStyle: TextStyle(color: AppTheme.white),
-                                        weekendStyle: TextStyle(color: AppTheme.white),
+                                        weekdayStyle: TextStyle(
+                                          color: AppTheme.white,
+                                        ),
+                                        weekendStyle: TextStyle(
+                                          color: AppTheme.white,
+                                        ),
                                       ),
                                       calendarBuilders: CalendarBuilders(
                                         markerBuilder: (context, day, events) {
-                                          if (events.isEmpty) return const SizedBox.shrink();
+                                          if (events.isEmpty)
+                                            return const SizedBox.shrink();
                                           return Align(
                                             alignment: Alignment.bottomCenter,
                                             child: Container(
                                               width: 6,
                                               height: 6,
-                                              margin: const EdgeInsets.only(bottom: 8),
+                                              margin: const EdgeInsets.only(
+                                                bottom: 8,
+                                              ),
                                               decoration: const BoxDecoration(
                                                 color: AppTheme.primaryBlue,
                                                 shape: BoxShape.circle,
@@ -151,20 +194,43 @@ class _AppointmentViewState extends State<AppointmentView> {
                                         },
                                       ),
                                       calendarStyle: CalendarStyle(
-                                        outsideTextStyle: const TextStyle(color: AppTheme.softPink),
-                                        defaultTextStyle: TextStyle(color: AppTheme.black, fontSize: compact ? 12 : 14),
-                                        weekendTextStyle: TextStyle(color: AppTheme.black, fontSize: compact ? 12 : 14),
+                                        outsideTextStyle: const TextStyle(
+                                          color: AppTheme.softPink,
+                                        ),
+                                        defaultTextStyle: TextStyle(
+                                          color: AppTheme.black,
+                                          fontSize: compact ? 12 : 14,
+                                        ),
+                                        weekendTextStyle: TextStyle(
+                                          color: AppTheme.black,
+                                          fontSize: compact ? 12 : 14,
+                                        ),
                                         markersMaxCount: 1,
-                                        markerDecoration: const BoxDecoration(color: AppTheme.primaryBlue, shape: BoxShape.circle),
-                                        selectedDecoration: const BoxDecoration(color: AppTheme.softGreen, shape: BoxShape.circle),
-                                        selectedTextStyle: const TextStyle(color: AppTheme.black),
+                                        markerDecoration: const BoxDecoration(
+                                          color: AppTheme.primaryBlue,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        selectedDecoration: const BoxDecoration(
+                                          color: AppTheme.softGreen,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        selectedTextStyle: const TextStyle(
+                                          color: AppTheme.black,
+                                        ),
                                         todayDecoration: BoxDecoration(
                                           color: AppTheme.softBlue,
                                           shape: BoxShape.circle,
-                                          border: Border.all(color: AppTheme.white, width: 1),
+                                          border: Border.all(
+                                            color: AppTheme.white,
+                                            width: 1,
+                                          ),
                                         ),
-                                        todayTextStyle: const TextStyle(color: AppTheme.black),
-                                        cellMargin: EdgeInsets.all(compact ? 2 : 4),
+                                        todayTextStyle: const TextStyle(
+                                          color: AppTheme.black,
+                                        ),
+                                        cellMargin: EdgeInsets.all(
+                                          compact ? 2 : 4,
+                                        ),
                                       ),
                                       onDaySelected: (selectedDay, focusedDay) {
                                         setState(() {
@@ -172,43 +238,74 @@ class _AppointmentViewState extends State<AppointmentView> {
                                           _focusedDay = focusedDay;
                                         });
                                       },
-                                      onPageChanged: (focusedDay) => _focusedDay = focusedDay,
+                                      onPageChanged: (focusedDay) =>
+                                          _focusedDay = focusedDay,
                                     ),
                                   ],
                                 ),
                               ),
                               SizedBox(height: compact ? 12 : 18),
-                              SizedBox(
-                                width: compact ? double.infinity : 300,
-                                child: Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: horizontal),
-                                  child: OutlinedButton.icon(
-                                    onPressed: () async {
-                                      final result = await Navigator.of(context).push<Object?>(
-                                        MaterialPageRoute(builder: (_) => const AppointmentFormView()),
-                                      );
-                                      if (result == 'open_profile') {
-                                        widget.onOpenProfile?.call();
-                                        return;
-                                      }
-                                      if (result == true) _loadAppointments();
-                                    },
-                                    iconAlignment: IconAlignment.end,
-                                    icon: const Icon(Icons.add, size: 18),
-                                    label: Text('Ajouter un rendez-vous', maxLines: 1, overflow: TextOverflow.ellipsis, style: textTheme.bodyMedium),
-                                    style: OutlinedButton.styleFrom(
-                                      foregroundColor: AppTheme.black,
-                                      side: const BorderSide(color: AppTheme.primaryPink),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                                      padding: EdgeInsets.symmetric(horizontal: compact ? 10 : 14, vertical: compact ? 10 : 12),
+                              if (widget.canEditAgenda)
+                                SizedBox(
+                                  width: compact ? double.infinity : 300,
+                                  child: Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: horizontal,
+                                    ),
+                                    child: OutlinedButton.icon(
+                                      onPressed: () async {
+                                        if (!widget.canEditAgenda) return;
+                                        final result =
+                                            await Navigator.of(
+                                              context,
+                                            ).push<Object?>(
+                                              MaterialPageRoute(
+                                                builder: (_) =>
+                                                    const AppointmentFormView(),
+                                              ),
+                                            );
+                                        if (result == 'open_profile') {
+                                          widget.onOpenProfile?.call();
+                                          return;
+                                        }
+                                        if (result == true) _loadAppointments();
+                                      },
+                                      iconAlignment: IconAlignment.end,
+                                      icon: const Icon(Icons.add, size: 18),
+                                      label: Text(
+                                        'Ajouter un rendez-vous',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: textTheme.bodyMedium,
+                                      ),
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: AppTheme.black,
+                                        side: const BorderSide(
+                                          color: AppTheme.primaryPink,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            14,
+                                          ),
+                                        ),
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: compact ? 10 : 14,
+                                          vertical: compact ? 10 : 12,
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
                               SizedBox(height: compact ? 12 : 18),
                               Padding(
-                                padding: EdgeInsets.symmetric(horizontal: horizontal),
-                                child: _buildAgendaSection(selectedDayAppointments, textTheme, compact),
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: horizontal,
+                                ),
+                                child: _buildAgendaSection(
+                                  selectedDayAppointments,
+                                  textTheme,
+                                  compact,
+                                ),
                               ),
                               const SizedBox(height: 20),
                             ],
@@ -226,7 +323,11 @@ class _AppointmentViewState extends State<AppointmentView> {
     );
   }
 
-  Widget _buildAgendaSection(List<Appointment> selectedDayAppointments, TextTheme textTheme, bool compact) {
+  Widget _buildAgendaSection(
+    List<Appointment> selectedDayAppointments,
+    TextTheme textTheme,
+    bool compact,
+  ) {
     if (_isLoading) return const Center(child: CircularProgressIndicator());
 
     if (_error != null) {
@@ -234,9 +335,15 @@ class _AppointmentViewState extends State<AppointmentView> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(_error!, style: textTheme.bodyMedium?.copyWith(color: Colors.black54)),
+            Text(
+              _error!,
+              style: textTheme.bodyMedium?.copyWith(color: Colors.black54),
+            ),
             const SizedBox(height: 10),
-            TextButton(onPressed: _loadAppointments, child: const Text('Réessayer')),
+            TextButton(
+              onPressed: _loadAppointments,
+              child: const Text('Réessayer'),
+            ),
           ],
         ),
       );
@@ -244,7 +351,10 @@ class _AppointmentViewState extends State<AppointmentView> {
 
     if (_appointments.isEmpty) {
       return Center(
-        child: Text('Aucun rendez-vous enregistre pour le moment', style: textTheme.bodyMedium?.copyWith(color: Colors.black54)),
+        child: Text(
+          'Aucun rendez-vous enregistre pour le moment',
+          style: textTheme.bodyMedium?.copyWith(color: Colors.black54),
+        ),
       );
     }
 
@@ -260,7 +370,10 @@ class _AppointmentViewState extends State<AppointmentView> {
               isToday ? 'Aujourd\'hui' : 'Rendez-vous du jour',
               style: compact ? textTheme.titleMedium : textTheme.titleLarge,
             ),
-            Text(DateFormat('EEE d MMM', 'fr_FR').format(_selectedDay), style: compact ? textTheme.bodyLarge : textTheme.titleMedium),
+            Text(
+              DateFormat('EEE d MMM', 'fr_FR').format(_selectedDay),
+              style: compact ? textTheme.bodyLarge : textTheme.titleMedium,
+            ),
           ],
         ),
         const SizedBox(height: 10),
@@ -269,7 +382,10 @@ class _AppointmentViewState extends State<AppointmentView> {
         if (selectedDayAppointments.isEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 8),
-            child: Text('Aucun rendez-vous pour ce jour', style: textTheme.bodyMedium?.copyWith(color: Colors.black54)),
+            child: Text(
+              'Aucun rendez-vous pour ce jour',
+              style: textTheme.bodyMedium?.copyWith(color: Colors.black54),
+            ),
           )
         else
           ListView.builder(
@@ -279,7 +395,9 @@ class _AppointmentViewState extends State<AppointmentView> {
             itemBuilder: (context, index) => _AppointmentCard(
               appointment: selectedDayAppointments[index],
               compact: compact,
-              onEdit: () => _editAppointment(selectedDayAppointments[index]),
+              onEdit: widget.canEditAgenda
+                  ? () => _editAppointment(selectedDayAppointments[index])
+                  : null,
             ),
           ),
       ],
@@ -291,12 +409,12 @@ class _AppointmentCard extends StatelessWidget {
   const _AppointmentCard({
     required this.appointment,
     required this.compact,
-    required this.onEdit,
+    this.onEdit,
   });
 
   final Appointment appointment;
   final bool compact;
-  final VoidCallback onEdit;
+  final VoidCallback? onEdit;
 
   String _consultationTypeLabel(String? value) {
     switch (value) {
@@ -318,7 +436,8 @@ class _AppointmentCard extends StatelessWidget {
         ? _consultationTypeLabel(appointment.consultationType)
         : appointment.title.trim();
     final hasDescription =
-        appointment.description != null && appointment.description!.trim().isNotEmpty;
+        appointment.description != null &&
+        appointment.description!.trim().isNotEmpty;
 
     return Container(
       child: InkWell(
@@ -336,11 +455,19 @@ class _AppointmentCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(DateFormat('d MMM', 'fr_FR').format(appointment.startTime), style: textTheme.bodyMedium),
+                    Text(
+                      DateFormat(
+                        'd MMM',
+                        'fr_FR',
+                      ).format(appointment.startTime),
+                      style: textTheme.bodyMedium,
+                    ),
                     const SizedBox(height: 2),
                     Text(
                       '${DateFormat('HH:mm').format(appointment.startTime)} - ${DateFormat('HH:mm').format(appointment.endTime)}',
-                      style: textTheme.bodySmall?.copyWith(color: Colors.black54),
+                      style: textTheme.bodySmall?.copyWith(
+                        color: Colors.black54,
+                      ),
                     ),
                   ],
                 ),
@@ -350,35 +477,63 @@ class _AppointmentCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        title,
-                        style: compact ? textTheme.bodyMedium : textTheme.bodyLarge,
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            title,
+                            style: compact
+                                ? textTheme.bodyMedium
+                                : textTheme.bodyLarge,
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
                     const SizedBox(height: 2),
                     Text(
                       'Type de consultation',
-                      style: compact ? textTheme.bodyMedium : textTheme.bodyLarge,
+                      style: compact
+                          ? textTheme.bodyMedium
+                          : textTheme.bodyLarge,
                     ),
                     Text(
-                      appointment.consultationType == null || appointment.consultationType!.trim().isEmpty
+                      appointment.consultationType == null ||
+                              appointment.consultationType!.trim().isEmpty
                           ? 'Non renseigne'
-                          : _consultationTypeLabel(appointment.consultationType),
-                      style: textTheme.bodyMedium?.copyWith(color: Colors.black54),
+                          : _consultationTypeLabel(
+                              appointment.consultationType,
+                            ),
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: Colors.black54,
+                      ),
                     ),
                     const SizedBox(height: 3),
-                    Text('Lieu', style: compact ? textTheme.bodyMedium : textTheme.bodyLarge),
-                    Text(appointment.location ?? '-', style: textTheme.bodyMedium?.copyWith(color: Colors.black54)),
-                    const SizedBox(height: 2),
-                    Text('Description', style: compact ? textTheme.bodyMedium : textTheme.bodyLarge),
                     Text(
-                      hasDescription ? appointment.description! : 'Pas de description',
-                      style: textTheme.bodyMedium?.copyWith(color: Colors.black54),
+                      'Lieu',
+                      style: compact
+                          ? textTheme.bodyMedium
+                          : textTheme.bodyLarge,
+                    ),
+                    Text(
+                      appointment.location ?? '-',
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: Colors.black54,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Description',
+                      style: compact
+                          ? textTheme.bodyMedium
+                          : textTheme.bodyLarge,
+                    ),
+                    Text(
+                      hasDescription
+                          ? appointment.description!
+                          : 'Pas de description',
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: Colors.black54,
+                      ),
                     ),
                   ],
                 ),

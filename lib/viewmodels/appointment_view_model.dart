@@ -235,17 +235,17 @@ class AppointmentViewModel extends ChangeNotifier {
     } catch (e) {
       final message = e.toString();
       if (message.contains('401') || message.toLowerCase().contains('unauthorized')) {
-        lastError = 'Session expiree. Reconnecte-toi.';
+        lastError = 'Session expirée. Reconnecte-toi.';
       } else if (message.contains('403')) {
         lastError = 'Acces refuse pour cette action.';
       } else if (message.contains('400')) {
-        lastError = 'Donnees invalides. Verifie les champs.';
+        lastError = 'Données invalides. Vérifie les champs.';
       } else if (message.contains('500')) {
         lastError = 'Erreur serveur. Reessaie dans un instant.';
       } else {
         lastError = isEditing
-            ? 'Echec de modification du rendez-vous: $message'
-            : 'Echec de creation du rendez-vous: $message';
+            ? 'Échec de modification du rendez-vous: $message'
+            : 'Échec de création du rendez-vous: $message';
       }
 
       isSaving = false;
@@ -272,7 +272,7 @@ class AppointmentViewModel extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      lastError = 'Echec de suppression du rendez-vous: $e';
+      lastError = 'Échec de suppression du rendez-vous: $e';
       isSaving = false;
       notifyListeners();
       return false;

@@ -9,7 +9,9 @@ import 'stock_add_view.dart';
 import 'stock_update_view.dart';
 
 class StockView extends StatefulWidget {
-  const StockView({super.key});
+  const StockView({super.key, this.canEditStock = true});
+
+  final bool canEditStock;
 
   @override
   State<StockView> createState() => _StockViewState();
@@ -82,39 +84,49 @@ class _StockViewState extends State<StockView> {
                         else if (_viewModel.error != null)
                           Text(
                             'Erreur : ${_viewModel.error}',
-                            style: textTheme.bodyMedium?.copyWith(color: Colors.red),
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: Colors.red,
+                            ),
                           )
                         else ...[
                           Text(
                             subtitle,
-                            style: textTheme.bodyMedium?.copyWith(color: Colors.black87),
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: Colors.black87,
+                            ),
                           ),
                           const SizedBox(height: 24),
-                          GestureDetector(
-                            onTap: () async {
-                              final created = await Navigator.of(context).push<bool>(
-                                MaterialPageRoute(
-                                  builder: (_) => const StockAddView(),
-                                ),
-                              );
-                              if (created == true) {
-                                _viewModel.loadStock();
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Médicament ajouté au stock'),
-                                    ),
-                                  );
+                          if (widget.canEditStock)
+                            GestureDetector(
+                              onTap: () async {
+                                final created = await Navigator.of(context)
+                                    .push<bool>(
+                                      MaterialPageRoute(
+                                        builder: (_) => const StockAddView(),
+                                      ),
+                                    );
+                                if (created == true) {
+                                  _viewModel.loadStock();
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Médicament ajouté au stock',
+                                        ),
+                                      ),
+                                    );
+                                  }
                                 }
-                              }
-                            },
-                            child: const _AddMedicamentCard(),
-                          ),
+                              },
+                              child: const _AddMedicamentCard(),
+                            ),
                           const SizedBox(height: 24),
                           if (_viewModel.items.isEmpty)
                             Center(
                               child: Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 40),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 40,
+                                ),
                                 child: Text(
                                   'Pas de stock créé / trouvé',
                                   style: textTheme.bodyMedium?.copyWith(
@@ -127,7 +139,9 @@ class _StockViewState extends State<StockView> {
                             ..._viewModel.items.map(
                               (item) => _StockItemCard(
                                 item: item,
-                                treatment: _viewModel.activeTreatments[item.medicationId],
+                                canEditStock: widget.canEditStock,
+                                treatment: _viewModel
+                                    .activeTreatments[item.medicationId],
                                 onDeleted: _viewModel.loadStock,
                               ),
                             ),
@@ -148,9 +162,15 @@ class _StockViewState extends State<StockView> {
 // ---------------------------------------------------------------------------
 
 class _StockItemCard extends StatelessWidget {
-  const _StockItemCard({required this.item, this.treatment, this.onDeleted});
+  const _StockItemCard({
+    required this.item,
+    required this.canEditStock,
+    this.treatment,
+    this.onDeleted,
+  });
 
   final StockItem item;
+  final bool canEditStock;
   final TreatmentItem? treatment;
   final VoidCallback? onDeleted;
 
@@ -163,9 +183,14 @@ class _StockItemCard extends StatelessWidget {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (_) => SizedBox(
-        height: MediaQuery.of(context).size.height *
+        height:
+            MediaQuery.of(context).size.height *
             (treatment != null ? 0.78 : 0.50),
-        child: _StockDetailSheet(item: item, treatment: treatment),
+        child: _StockDetailSheet(
+          item: item,
+          treatment: treatment,
+          canEditStock: canEditStock,
+        ),
       ),
     );
     if (deleted == true) onDeleted?.call();
@@ -310,9 +335,14 @@ class _StockItemCard extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _StockDetailSheet extends StatefulWidget {
-  const _StockDetailSheet({required this.item, this.treatment});
+  const _StockDetailSheet({
+    required this.item,
+    required this.canEditStock,
+    this.treatment,
+  });
 
   final StockItem item;
+  final bool canEditStock;
   final TreatmentItem? treatment;
 
   @override
@@ -333,8 +363,9 @@ class _StockDetailSheetState extends State<_StockDetailSheet> {
   Future<void> _loadSchedules() async {
     setState(() => _loadingSchedules = true);
     try {
-      final schedules =
-          await ApiService.getTreatmentSchedules(widget.treatment!.id);
+      final schedules = await ApiService.getTreatmentSchedules(
+        widget.treatment!.id,
+      );
       if (mounted) setState(() => _schedules = schedules);
     } catch (_) {
       if (mounted) setState(() => _schedules = const []);
@@ -385,10 +416,7 @@ class _StockDetailSheetState extends State<_StockDetailSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur : $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Erreur : $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -437,10 +465,9 @@ class _StockDetailSheetState extends State<_StockDetailSheet> {
                 Text(
                   widget.item.medication.pharmaceuticalForm,
                   textAlign: TextAlign.center,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(color: Colors.black54),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: Colors.black54),
                 ),
                 const SizedBox(height: 24),
 
@@ -458,10 +485,7 @@ class _StockDetailSheetState extends State<_StockDetailSheet> {
                           '${widget.item.quantity} unité${widget.item.quantity != 1 ? 's' : ''}',
                     ),
                     const _Divider(),
-                    _InfoRow(
-                      label: 'Lieu',
-                      value: widget.item.location,
-                    ),
+                    _InfoRow(label: 'Lieu', value: widget.item.location),
                   ],
                 ),
 
@@ -502,9 +526,7 @@ class _StockDetailSheetState extends State<_StockDetailSheet> {
                             children: [
                               Text(
                                 'Jours',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodyMedium
+                                style: Theme.of(context).textTheme.bodyMedium
                                     ?.copyWith(color: Colors.black45),
                               ),
                               const Spacer(),
@@ -539,9 +561,7 @@ class _StockDetailSheetState extends State<_StockDetailSheet> {
                               Expanded(
                                 child: Text(
                                   'HEURE',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodyMedium
+                                  style: Theme.of(context).textTheme.bodyMedium
                                       ?.copyWith(
                                         color: Colors.black45,
                                         fontSize: 11,
@@ -551,9 +571,7 @@ class _StockDetailSheetState extends State<_StockDetailSheet> {
                               ),
                               Text(
                                 'QUANTITÉ',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodyMedium
+                                style: Theme.of(context).textTheme.bodyMedium
                                     ?.copyWith(
                                       color: Colors.black45,
                                       fontSize: 11,
@@ -571,14 +589,14 @@ class _StockDetailSheetState extends State<_StockDetailSheet> {
                                 Expanded(
                                   child: Text(
                                     s.timeOfDay,
-                                    style: Theme.of(context).textTheme.bodyLarge,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodyLarge,
                                   ),
                                 ),
                                 Text(
                                   '${s.quantity % 1 == 0 ? s.quantity.toInt() : s.quantity} unit.',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodyMedium
+                                  style: Theme.of(context).textTheme.bodyMedium
                                       ?.copyWith(color: Colors.black54),
                                 ),
                               ],
@@ -589,28 +607,30 @@ class _StockDetailSheetState extends State<_StockDetailSheet> {
                   ),
                 ],
 
-                const SizedBox(height: 28),
-                FilledButton(
-                  onPressed: () async {
-                    final updated = await Navigator.of(context).push<bool>(
-                      MaterialPageRoute(
-                        builder: (_) => StockUpdateView(item: widget.item),
-                      ),
-                    );
-                    if (updated == true && mounted) {
-                      Navigator.of(context).pop(true);
-                    }
-                  },
-                  child: const Text('Mettre à jour le stock'),
-                ),
-                const SizedBox(height: 8),
-                _DeleteButton(
-                  label: widget.treatment != null
-                      ? 'Supprimer le stock et le traitement'
-                      : 'Supprimer du stock',
-                  isLoading: _isDeleting,
-                  onPressed: _deleteAll,
-                ),
+                if (widget.canEditStock) ...[
+                  const SizedBox(height: 28),
+                  FilledButton(
+                    onPressed: () async {
+                      final updated = await Navigator.of(context).push<bool>(
+                        MaterialPageRoute(
+                          builder: (_) => StockUpdateView(item: widget.item),
+                        ),
+                      );
+                      if (updated == true && mounted) {
+                        Navigator.of(context).pop(true);
+                      }
+                    },
+                    child: const Text('Mettre à jour le stock'),
+                  ),
+                  const SizedBox(height: 8),
+                  _DeleteButton(
+                    label: widget.treatment != null
+                        ? 'Supprimer le stock et le traitement'
+                        : 'Supprimer du stock',
+                    isLoading: _isDeleting,
+                    onPressed: _deleteAll,
+                  ),
+                ],
               ],
             ),
           ),
@@ -646,10 +666,7 @@ class _SectionHeader extends StatelessWidget {
         const SizedBox(width: 8),
         Text(
           label,
-          style: Theme.of(context)
-              .textTheme
-              .bodyLarge
-              ?.copyWith(color: color),
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: color),
         ),
       ],
     );

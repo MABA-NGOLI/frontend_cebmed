@@ -1,14 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:async';
 
 import '../models/appointment.dart';
 import '../services/api_service.dart';
 
 class HomeViewModel extends ChangeNotifier {
-  static const _storageCodeKey = 'caregiver_share_code';
-  static const _storageCodeDateKey = 'caregiver_share_code_created_at';
+  static const _storageCodeKeyBase = 'caregiver_share_code';
+  static const _storageCodeDateKeyBase = 'caregiver_share_code_created_at';
 
   DateTime focusedDay = DateTime.now();
   DateTime selectedDay = DateTime.now();
@@ -19,20 +20,26 @@ class HomeViewModel extends ChangeNotifier {
   Timer? _refreshCodeTimer;
   static const Duration _codeRefreshInterval = Duration(hours: 8);
 
+  int? _userId;
+
+  String _codeKey() =>
+      _userId == null ? _storageCodeKeyBase : '${_storageCodeKeyBase}_$_userId';
+
+  String _codeDateKey() => _userId == null
+      ? _storageCodeDateKeyBase
+      : '${_storageCodeDateKeyBase}_$_userId';
+
   Future<void> initialize() async {
     _startAutoRefreshCode();
+    await loadUser();
     await _loadCachedCode();
-    await Future.wait([
-      loadUser(),
-      ensureFreshShareCode(),
-      loadAppointments(),
-    ]);
+    await Future.wait([ensureFreshShareCode(), loadAppointments()]);
   }
 
   Future<void> _loadCachedCode() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final cached = prefs.getString(_storageCodeKey);
+      final cached = prefs.getString(_codeKey());
       if (cached != null && cached.trim().isNotEmpty) {
         shareCode = cached.trim();
         notifyListeners();
@@ -43,16 +50,16 @@ class HomeViewModel extends ChangeNotifier {
   Future<void> _cacheCode(String code) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_storageCodeKey, code);
-      await prefs.setString(_storageCodeDateKey, DateTime.now().toIso8601String());
+      await prefs.setString(_codeKey(), code);
+      await prefs.setString(_codeDateKey(), DateTime.now().toIso8601String());
     } catch (_) {}
   }
 
   Future<bool> _shouldRegenerateCode() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final createdAtRaw = prefs.getString(_storageCodeDateKey);
-      final cachedCode = prefs.getString(_storageCodeKey);
+      final createdAtRaw = prefs.getString(_codeDateKey());
+      final cachedCode = prefs.getString(_codeKey());
 
       if (cachedCode == null || cachedCode.trim().isEmpty) {
         return true;
@@ -95,7 +102,10 @@ class HomeViewModel extends ChangeNotifier {
   Future<void> loadUser() async {
     try {
       final me = await ApiService.getMe();
-      firstName = me.user.firstName.trim().isEmpty ? 'user' : me.user.firstName.trim();
+      _userId = me.user.id;
+      firstName = me.user.firstName.trim().isEmpty
+          ? 'user'
+          : me.user.firstName.trim();
       notifyListeners();
     } catch (_) {}
   }
@@ -147,7 +157,8 @@ class HomeViewModel extends ChangeNotifier {
     return v[0].toUpperCase() + v.substring(1);
   }
 
-  DateTime weekStart(DateTime day) => DateTime(day.year, day.month, day.day - day.weekday + 1);
+  DateTime weekStart(DateTime day) =>
+      DateTime(day.year, day.month, day.day - day.weekday + 1);
   DateTime weekEnd(DateTime day) => weekStart(day).add(const Duration(days: 6));
 
   void onDaySelected(DateTime selected, DateTime focused) {

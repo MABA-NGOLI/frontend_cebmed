@@ -213,7 +213,7 @@ class _AppointmentFormViewState extends State<AppointmentFormView> {
         SnackBar(
           content: Text(
             _viewModel.isEditing
-                ? 'Rendez-vous modifie'
+                ? 'Rendez-vous modifié'
                 : 'Rendez-vous enregistre le ${_viewModel.formattedDate} de ${_viewModel.formattedStartTime} a ${_viewModel.formattedEndTime}',
           ),
         ),

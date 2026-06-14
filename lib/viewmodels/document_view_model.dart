@@ -13,7 +13,7 @@ class DocumentActionResult {
   const DocumentActionResult({required this.success, required this.message});
 
   final bool success;
-  final String message;
+  final String? message;
 }
 
 class PendingDocumentUpload {
@@ -203,7 +203,7 @@ class DocumentViewModel extends ChangeNotifier {
 
       return const DocumentActionResult(
         success: true,
-        message: 'Partage ouvert',
+        message: null,
       );
     } catch (e) {
       return DocumentActionResult(

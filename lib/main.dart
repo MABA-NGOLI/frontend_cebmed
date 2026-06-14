@@ -1,10 +1,12 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'theme/app_theme.dart';
+import 'services/caregiver_mode_service.dart';
 import 'services/notification_service.dart';
 import 'views/authentication/login_view.dart';
+import 'views/authentication/forgot_password_view.dart';
 import 'views/authentication/role_selection_view.dart';
 import 'views/authentication/signup_view.dart';
 import 'views/entry/splash_view.dart' show SplashResult, SplashView;
@@ -15,6 +17,7 @@ enum EntryStage {
   splash,
   welcome,
   login,
+  forgotPassword,
   signup,
   roleSelection,
   app,
@@ -36,6 +39,22 @@ class CebMedApp extends StatefulWidget {
 
 class _CebMedAppState extends State<CebMedApp> {
   EntryStage stage = EntryStage.splash;
+  bool _isCaregiver = false;
+  bool _openCaregiverSetupOnAppStart = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedRole();
+  }
+
+  Future<void> _loadSavedRole() async {
+    final saved = await CaregiverModeService.isCaregiver();
+    if (!mounted) return;
+    setState(() {
+      _isCaregiver = saved;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -73,6 +92,7 @@ class _CebMedAppState extends State<CebMedApp> {
         home = LoginView(
           onBack: () {
             setState(() {
+              _openCaregiverSetupOnAppStart = false;
               stage = EntryStage.welcome;
             });
           },
@@ -86,6 +106,26 @@ class _CebMedAppState extends State<CebMedApp> {
               stage = EntryStage.signup;
             });
           },
+          onForgotPassword: () {
+            setState(() {
+              stage = EntryStage.forgotPassword;
+            });
+          },
+        );
+        break;
+
+      case EntryStage.forgotPassword:
+        home = ForgotPasswordView(
+          onBack: () {
+            setState(() {
+              stage = EntryStage.login;
+            });
+          },
+          onSuccess: () {
+            setState(() {
+              stage = EntryStage.login;
+            });
+          },
         );
         break;
 
@@ -93,6 +133,7 @@ class _CebMedAppState extends State<CebMedApp> {
         home = SignupView(
           onBack: () {
             setState(() {
+              _openCaregiverSetupOnAppStart = false;
               stage = EntryStage.welcome;
             });
           },
@@ -111,18 +152,25 @@ class _CebMedAppState extends State<CebMedApp> {
 
       case EntryStage.roleSelection:
         home = RoleSelectionView(
-          onSelectRole: (_) {
+          onSelectRole: (role) async {
+            final isCaregiver = role == UserRole.caregiver;
+            await CaregiverModeService.setIsCaregiver(isCaregiver);
+            if (!mounted) return;
             setState(() {
+              _isCaregiver = isCaregiver;
+              _openCaregiverSetupOnAppStart = isCaregiver;
               stage = EntryStage.app;
             });
           },
         );
         break;
-
       case EntryStage.app:
         home = MainShell(
+          isCaregiver: _isCaregiver,
+          openCaregiverSetupOnStart: _openCaregiverSetupOnAppStart,
           onLogout: () {
             setState(() {
+              _openCaregiverSetupOnAppStart = false;
               stage = EntryStage.welcome;
             });
           },
@@ -135,10 +183,7 @@ class _CebMedAppState extends State<CebMedApp> {
       title: 'CebMed',
       theme: AppTheme.light(),
       locale: const Locale('fr', 'FR'),
-      supportedLocales: const [
-        Locale('fr', 'FR'),
-        Locale('en', 'US'),
-      ],
+      supportedLocales: const [Locale('fr', 'FR'), Locale('en', 'US')],
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,

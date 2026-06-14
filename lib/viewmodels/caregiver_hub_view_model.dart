@@ -8,6 +8,7 @@ class CaregiverHubViewModel extends ChangeNotifier {
   bool isLoading = false;
   bool isSubmittingCode = false;
   String? errorMessage;
+  String? successMessage;
 
   List<CaregiverProfileModel> profiles = const [];
   CaregiverProfileModel? activeProfile;
@@ -39,7 +40,7 @@ class CaregiverHubViewModel extends ChangeNotifier {
       activeProfile ??= profiles.isNotEmpty ? profiles.first : null;
       await CaregiverModeService.setActivePatientId(activeProfile?.patientId);
     } catch (e) {
-      errorMessage = e.toString().replaceFirst('Exception: ', '');
+      errorMessage = _cleanErrorMessage(e);
     } finally {
       isLoading = false;
       notifyListeners();
@@ -69,7 +70,7 @@ class CaregiverHubViewModel extends ChangeNotifier {
       await refreshProfiles();
       return true;
     } catch (e) {
-      errorMessage = e.toString().replaceFirst('Exception: ', '');
+      errorMessage = _cleanErrorMessage(e);
       isLoading = false;
       notifyListeners();
       return false;
@@ -93,11 +94,27 @@ class CaregiverHubViewModel extends ChangeNotifier {
       await refreshProfiles();
       return true;
     } catch (e) {
-      errorMessage = e.toString().replaceFirst('Exception: ', '');
+      errorMessage = _cleanErrorMessage(e);
       return false;
     } finally {
       isSubmittingCode = false;
       notifyListeners();
     }
   }
+}
+
+String _cleanErrorMessage(Object error) {
+  return error
+      .toString()
+      .replaceFirst('Exception: ', '')
+      .replaceAll('dÃ©jÃ ', 'déjà')
+      .replaceAll('utilisÃ©e', 'utilisée')
+      .replaceAll('expirÃ©', 'expiré')
+      .replaceAll('rÃ©ponse', 'réponse')
+      .replaceAll('crÃ©ation', 'création')
+      .replaceAll('Ã©', 'é')
+      .replaceAll('Ã¨', 'è')
+      .replaceAll('Ã ', 'à')
+      .replaceAll('Ãª', 'ê')
+      .trim();
 }

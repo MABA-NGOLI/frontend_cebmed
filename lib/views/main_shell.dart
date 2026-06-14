@@ -13,11 +13,13 @@ class MainShell extends StatefulWidget {
     required this.onLogout,
     this.isCaregiver = false,
     this.openCaregiverSetupOnStart = false,
+    this.onCancelCaregiverSetup,
   });
 
   final VoidCallback onLogout;
   final bool isCaregiver;
   final bool openCaregiverSetupOnStart;
+  final VoidCallback? onCancelCaregiverSetup;
 
   @override
   State<MainShell> createState() => _MainShellState();
@@ -50,6 +52,11 @@ class _MainShellState extends State<MainShell> {
         if (!mounted) return;
         await _openAddProfile();
         if (!mounted) return;
+        if (!_caregiverHub.hasProfiles &&
+            widget.onCancelCaregiverSetup != null) {
+          widget.onCancelCaregiverSetup!();
+          return;
+        }
         setState(() {
           _isPreparingCaregiverMode = false;
         });

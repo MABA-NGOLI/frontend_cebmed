@@ -168,6 +168,15 @@ class _CebMedAppState extends State<CebMedApp> {
         home = MainShell(
           isCaregiver: _isCaregiver,
           openCaregiverSetupOnStart: _openCaregiverSetupOnAppStart,
+          onCancelCaregiverSetup: () async {
+            await CaregiverModeService.setIsCaregiver(false);
+            if (!mounted) return;
+            setState(() {
+              _isCaregiver = false;
+              _openCaregiverSetupOnAppStart = false;
+              stage = EntryStage.roleSelection;
+            });
+          },
           onLogout: () {
             setState(() {
               _openCaregiverSetupOnAppStart = false;

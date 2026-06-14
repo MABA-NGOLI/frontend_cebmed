@@ -35,8 +35,8 @@ class CaregiverLinkViewModel extends ChangeNotifier {
       await ApiService.redeemCaregiverInvite(code);
       return true;
     } catch (e) {
-      final raw = e.toString().replaceFirst('Exception: ', '').trim();
-      errorMessage = raw.isEmpty ? 'Code invalide ou expiré' : raw;
+      final raw = _cleanErrorMessage(e).trim();
+      errorMessage = raw.isEmpty ? 'Code invalide ou expirÃ©' : raw;
       return false;
     } finally {
       isLoading = false;
@@ -49,4 +49,20 @@ class CaregiverLinkViewModel extends ChangeNotifier {
     codeController.dispose();
     super.dispose();
   }
+}
+
+String _cleanErrorMessage(Object error) {
+  return error
+      .toString()
+      .replaceFirst('Exception: ', '')
+      .replaceAll('dÃ©jÃ ', 'déjà')
+      .replaceAll('utilisÃ©e', 'utilisée')
+      .replaceAll('expirÃ©', 'expiré')
+      .replaceAll('rÃ©ponse', 'réponse')
+      .replaceAll('crÃ©ation', 'création')
+      .replaceAll('Ã©', 'é')
+      .replaceAll('Ã¨', 'è')
+      .replaceAll('Ã ', 'à')
+      .replaceAll('Ãª', 'ê')
+      .trim();
 }

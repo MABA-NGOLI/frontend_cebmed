@@ -29,7 +29,11 @@ class _CaregiverAddProfileViewState extends State<CaregiverAddProfileView> {
     if (ok) {
       _codeController.clear();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profil ajouté avec succès')),
+        SnackBar(
+          content: Text(
+            widget.viewModel.successMessage ?? 'Profil ajouté avec succès',
+          ),
+        ),
       );
       return;
     }

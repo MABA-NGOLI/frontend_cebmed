@@ -100,9 +100,9 @@ class _ProfileViewState extends State<ProfileView> {
       await _loadMyCaregivers();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Mise ÃƒÆ’Ã‚Â  jour impossible : $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Mise à jour impossible : $e')));
     } finally {
       if (mounted) {
         setState(() {
@@ -186,9 +186,7 @@ class _ProfileViewState extends State<ProfileView> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          ok
-              ? 'Nom et prÃƒÆ’Ã‚Â©nom modifiÃƒÆ’Ã‚Â©s'
-              : (_viewModel.errorMessage ?? 'Erreur'),
+          ok ? 'Nom et prénom modifiés' : (_viewModel.errorMessage ?? 'Erreur'),
         ),
       ),
     );
@@ -327,7 +325,7 @@ class _ProfileViewState extends State<ProfileView> {
         builder: (context) => AlertDialog(
           title: const Text('Notifications desactivees'),
           content: const Text(
-            'Pour activer les rappels, autorisez les notifications dans les paramÃƒÆ’Ã‚Â¨tres de l\'application.',
+            'Pour activer les rappels, autorisez les notifications dans les paramètres de l\'application.',
           ),
           actions: [
             TextButton(
@@ -336,7 +334,7 @@ class _ProfileViewState extends State<ProfileView> {
             ),
             FilledButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Ouvrir les paramÃƒÆ’Ã‚Â¨tres'),
+              child: const Text('Ouvrir les paramètres'),
             ),
           ],
         ),
@@ -355,7 +353,7 @@ class _ProfileViewState extends State<ProfileView> {
       builder: (context) => AlertDialog(
         title: const Text('Supprimer ce profil ?'),
         content: Text(
-          'Vous ne suivrez plus ${profile.fullName}. Le compte patient ne sera pas supprimÃ©.',
+          'Vous ne suivrez plus ${profile.fullName}. Le compte patient ne sera pas supprimé.',
         ),
         actions: [
           TextButton(
@@ -380,7 +378,7 @@ class _ProfileViewState extends State<ProfileView> {
       SnackBar(
         content: Text(
           ok
-              ? 'Profil retirÃ© de votre liste'
+              ? 'Profil retiré de votre liste'
               : (widget.caregiverHub?.errorMessage ?? 'Suppression impossible'),
         ),
       ),
@@ -438,13 +436,13 @@ class _ProfileViewState extends State<ProfileView> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Compte supprime')));
+      ).showSnackBar(const SnackBar(content: Text('Compte supprimé')));
       widget.onLogout();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('ÃƒÆ’Ã¢â‚¬Â°chec suppression: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Échec suppression: $e')));
     }
   }
 

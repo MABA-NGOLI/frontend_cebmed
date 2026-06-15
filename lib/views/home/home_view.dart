@@ -7,7 +7,6 @@ import '../../viewmodels/caregiver_hub_view_model.dart';
 import '../../viewmodels/home_view_model.dart';
 import '../ordonnances/document_view.dart';
 import '../reminders/reminder_timeline_view.dart';
-import '../stock/stock_add_view.dart';
 import '../stock/stock_view.dart';
 
 class HomeView extends StatefulWidget {
@@ -76,6 +75,7 @@ class _HomeViewState extends State<HomeView> {
                     _buildWeekBlock(context),
                     const SizedBox(height: 16),
                     _buildNextReminderCard(context),
+                    _buildPendingNowCard(context),
                     const SizedBox(height: 16),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -341,160 +341,210 @@ class _HomeViewState extends State<HomeView> {
         child: Container(
           height: 68,
           decoration: BoxDecoration(
-            color: AppTheme.softPink.withValues(alpha: 0.5),
+            color: Colors.white,
             borderRadius: BorderRadius.circular(16),
+            boxShadow: const [
+              BoxShadow(color: Color(0x10000000), blurRadius: 8, offset: Offset(0, 2)),
+            ],
           ),
         ),
       );
     }
 
     final reminder = _viewModel.nextReminder;
-    if (reminder == null) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        child: Material(
-          color: AppTheme.softPink,
-          borderRadius: BorderRadius.circular(16),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(16),
-            onTap: () => Navigator.of(
-              context,
-            ).push(MaterialPageRoute(builder: (_) => const StockAddView())),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Aucun rappel prévu',
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: Colors.black54),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Ajouter un médicament',
-                          style: Theme.of(context).textTheme.bodyLarge,
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    width: 42,
-                    height: 42,
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.add,
-                      color: AppTheme.primaryPink,
-                      size: 22,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    final now = DateTime.now();
-    final countdown = reminder.countdownFrom(now);
+    final initialDay = reminder?.scheduledAt.toLocal() ?? DateTime.now();
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14),
       child: Material(
-        color: AppTheme.softPink,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (_) => ReminderTimelineView(
-                initialDay: reminder.scheduledAt.toLocal(),
-              ),
+              builder: (_) => ReminderTimelineView(initialDay: initialDay),
             ),
           ),
-          child: Padding(
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: const [
+                BoxShadow(color: Color(0x10000000), blurRadius: 8, offset: Offset(0, 2)),
+              ],
+            ),
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
             child: Row(
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Prochain rappel',
-                        style: Theme.of(
-                          context,
-                        ).textTheme.bodySmall?.copyWith(color: Colors.black54),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              reminder.medicationName,
-                              style: Theme.of(context).textTheme.bodyLarge,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Text(
-                            reminder.timeLabel,
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(color: Colors.black54),
-                          ),
-                          if (countdown.isNotEmpty) ...[
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppTheme.primaryPink.withValues(
-                                  alpha: 0.2,
-                                ),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                countdown,
-                                style: const TextStyle(
-                                  fontFamily: 'Montserrat',
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppTheme.primaryPink,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
                 Container(
                   width: 42,
                   height: 42,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
+                  decoration: BoxDecoration(
+                    color: AppTheme.softBlue.withValues(alpha: 0.6),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
-                    Icons.notifications_outlined,
-                    color: AppTheme.primaryPink,
-                    size: 22,
+                  child: const Icon(Icons.history_rounded, color: AppTheme.primaryBlue, size: 20),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: reminder == null
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Rappels',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.black45),
+                            ),
+                            const SizedBox(height: 2),
+                            Text('Voir l\'historique', style: Theme.of(context).textTheme.bodyLarge),
+                          ],
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Prochain rappel',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.black45),
+                            ),
+                            const SizedBox(height: 2),
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    reminder.medicationName,
+                                    style: Theme.of(context).textTheme.bodyLarge,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  reminder.timeLabel,
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.black45),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                ),
+                const Icon(Icons.chevron_right, color: Colors.black26, size: 20),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPendingNowCard(BuildContext context) {
+    final intake = _viewModel.pendingNowIntake;
+    if (intake == null) return const SizedBox.shrink();
+
+    final isOverdue = intake.scheduledAt.toLocal().isBefore(DateTime.now());
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppTheme.primaryPink,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: AppTheme.primaryPink.withValues(alpha: 0.35),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.25),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    isOverdue ? 'En retard' : 'Maintenant',
+                    style: const TextStyle(
+                      fontFamily: 'Montserrat',
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '${intake.scheduledAt.toLocal().hour.toString().padLeft(2, '0')}:${intake.scheduledAt.toLocal().minute.toString().padLeft(2, '0')}',
+                  style: const TextStyle(
+                    fontFamily: 'Montserrat',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white70,
                   ),
                 ),
               ],
             ),
-          ),
+            const SizedBox(height: 12),
+            Text(
+              intake.medicationName,
+              style: const TextStyle(
+                fontFamily: 'Montserrat',
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+            if (intake.treatment.dosage.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                intake.treatment.dosage,
+                style: const TextStyle(
+                  fontFamily: 'Montserrat',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w400,
+                  color: Colors.white70,
+                ),
+              ),
+            ],
+            const SizedBox(height: 18),
+            SizedBox(
+              width: double.infinity,
+              child: _viewModel.isValidating
+                  ? const Center(
+                      child: SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      ),
+                    )
+                  : GestureDetector(
+                      onTap: _viewModel.validateNowIntake,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        alignment: Alignment.center,
+                        child: const Text(
+                          'Confirmer la prise',
+                          style: TextStyle(
+                            fontFamily: 'Montserrat',
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.primaryPink,
+                          ),
+                        ),
+                      ),
+                    ),
+            ),
+          ],
         ),
       ),
     );

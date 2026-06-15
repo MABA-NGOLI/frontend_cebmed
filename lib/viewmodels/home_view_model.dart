@@ -50,7 +50,9 @@ class HomeViewModel extends ChangeNotifier {
   bool isGeneratingCode = false;
   List<Appointment> appointments = const [];
   NextReminder? nextReminder;
+  IntakeItem? pendingNowIntake;
   bool isLoadingReminder = true;
+  bool isValidating = false;
   Timer? _refreshCodeTimer;
   static const Duration _codeRefreshInterval = Duration(hours: 8);
 
@@ -152,15 +154,26 @@ class HomeViewModel extends ChangeNotifier {
       );
 
       IntakeItem? best;
+      IntakeItem? nowBest;
       for (final list in intakeLists) {
         for (final intake in list) {
           if (!intake.isPending) continue;
-          if (intake.scheduledAt.isBefore(now)) continue;
-          if (best == null || intake.scheduledAt.isBefore(best.scheduledAt)) {
-            best = intake;
+          final diffMin = intake.scheduledAt.difference(now).inMinutes;
+          // "À prendre maintenant" : en retard ou dans les 30 prochaines minutes
+          if (diffMin <= 30) {
+            if (nowBest == null || intake.scheduledAt.isBefore(nowBest.scheduledAt)) {
+              nowBest = intake;
+            }
+          }
+          // Prochain rappel futur (strictement après maintenant)
+          if (!intake.scheduledAt.isBefore(now)) {
+            if (best == null || intake.scheduledAt.isBefore(best.scheduledAt)) {
+              best = intake;
+            }
           }
         }
       }
+      pendingNowIntake = nowBest;
       debugPrint('[Home] nextReminder: ${best?.id} (${best?.medicationName}) @ ${best?.scheduledAt}');
       nextReminder = best == null
           ? null
@@ -173,6 +186,23 @@ class HomeViewModel extends ChangeNotifier {
       nextReminder = null;
     } finally {
       isLoadingReminder = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> validateNowIntake() async {
+    final intake = pendingNowIntake;
+    if (intake == null || isValidating) return;
+    isValidating = true;
+    notifyListeners();
+    try {
+      await ApiService.validateIntake(intake.id);
+      pendingNowIntake = null;
+      await loadNextReminder();
+    } catch (_) {
+      // L'utilisateur peut réessayer
+    } finally {
+      isValidating = false;
       notifyListeners();
     }
   }

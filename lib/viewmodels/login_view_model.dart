@@ -8,6 +8,8 @@ class LoginViewModel extends ChangeNotifier {
 
   bool isLoading = false;
   String? errorMessage;
+  bool emailNotVerified = false;
+  String? pendingEmail;
 
   bool get canSubmit =>
       emailController.text.trim().isNotEmpty &&
@@ -33,6 +35,7 @@ class LoginViewModel extends ChangeNotifier {
 
     isLoading = true;
     errorMessage = null;
+    emailNotVerified = false;
     notifyListeners();
 
     try {
@@ -40,7 +43,10 @@ class LoginViewModel extends ChangeNotifier {
       return true;
     } catch (e) {
       final raw = e.toString().replaceFirst('Exception: ', '').trim();
-      if (raw.contains('401') || raw.contains('incorrect')) {
+      if (raw == 'EMAIL_NOT_VERIFIED') {
+        emailNotVerified = true;
+        pendingEmail = email;
+      } else if (raw.contains('401') || raw.contains('incorrect')) {
         errorMessage = 'Email ou mot de passe incorrect';
       } else if (raw.isEmpty) {
         errorMessage = 'Connexion impossible pour le moment';

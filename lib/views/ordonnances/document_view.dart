@@ -96,12 +96,14 @@ class _DocumentViewState extends State<DocumentView> {
     );
   }
 
+  // Télécharge le fichier puis tente de créer un lien partageable pour le QR code.
   Future<void> _openDocument(DocumentModel doc) async {
     try {
       final bytes = await ApiService.downloadDocument(
         id: doc.id,
         fileUrl: doc.fileUrl,
       );
+      // Si le backend distant n'a pas encore la route share-link, le QR reste simplement indisponible.
       String? shareUrl;
       try {
         shareUrl = await ApiService.createDocumentShareLink(doc.id);

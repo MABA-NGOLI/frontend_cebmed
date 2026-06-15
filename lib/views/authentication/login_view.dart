@@ -1,8 +1,10 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
+import '../../services/notification_service.dart';
 import '../../theme/app_theme.dart';
 import '../../viewmodels/login_view_model.dart';
 import '../../widgets/auth/auth_widgets.dart';
+import 'email_verify_view.dart';
 
 class LoginView extends StatefulWidget {
   const LoginView({
@@ -39,11 +41,17 @@ class _LoginViewState extends State<LoginView> {
 
   Future<void> _submit() async {
     final ok = await _viewModel.login();
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
     if (ok) {
+      await NotificationService.syncFcmToken();
       widget.onSuccess();
+    } else if (_viewModel.emailNotVerified && _viewModel.pendingEmail != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => EmailVerifyView(email: _viewModel.pendingEmail!),
+        ),
+      );
     }
   }
 
@@ -63,15 +71,17 @@ class _LoginViewState extends State<LoginView> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Center(
-                        child: Text('Se connecter', style: Theme.of(context).textTheme.titleLarge),
+                        child: Text(
+                          'Se connecter',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
                       ),
                       const SizedBox(height: 8),
                       Center(
                         child: Text(
                           'Retrouve ton espace CEBMED',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: Colors.black54,
-                              ),
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(color: Colors.black54),
                         ),
                       ),
                       const SizedBox(height: 24),
@@ -105,11 +115,10 @@ class _LoginViewState extends State<LoginView> {
                         isLoading: _viewModel.isLoading,
                         onPressed: _viewModel.canSubmit ? _submit : null,
                       ),
-                      const SizedBox(height: 10),
                       Center(
                         child: TextButton(
                           onPressed: widget.onGoSignup,
-                          child: const Text('Creer un compte'),
+                          child: const Text('Créer un compte'),
                         ),
                       ),
                     ],
@@ -123,4 +132,3 @@ class _LoginViewState extends State<LoginView> {
     );
   }
 }
-

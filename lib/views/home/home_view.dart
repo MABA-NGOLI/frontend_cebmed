@@ -6,6 +6,8 @@ import '../../theme/app_theme.dart';
 import '../../viewmodels/caregiver_hub_view_model.dart';
 import '../../viewmodels/home_view_model.dart';
 import '../ordonnances/document_view.dart';
+import '../reminders/reminder_timeline_view.dart';
+import '../stock/stock_add_view.dart';
 import '../stock/stock_view.dart';
 
 class HomeView extends StatefulWidget {
@@ -72,7 +74,9 @@ class _HomeViewState extends State<HomeView> {
                     _buildHeader(context),
                     const SizedBox(height: 18),
                     _buildWeekBlock(context),
-                    const SizedBox(height: 92),
+                    const SizedBox(height: 16),
+                    _buildNextReminderCard(context),
+                    const SizedBox(height: 16),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Row(
@@ -275,7 +279,7 @@ class _HomeViewState extends State<HomeView> {
               ),
               const SizedBox(height: 18),
               Text(
-                'Personnes aidees',
+                'Personnes aidées',
                 style: Theme.of(context).textTheme.titleSmall,
               ),
               const SizedBox(height: 8),
@@ -324,6 +328,172 @@ class _HomeViewState extends State<HomeView> {
                 label: const Text('Ajouter un profil'),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNextReminderCard(BuildContext context) {
+    if (_viewModel.isLoadingReminder) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        child: Container(
+          height: 68,
+          decoration: BoxDecoration(
+            color: AppTheme.softPink.withValues(alpha: 0.5),
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+      );
+    }
+
+    final reminder = _viewModel.nextReminder;
+    if (reminder == null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        child: Material(
+          color: AppTheme.softPink,
+          borderRadius: BorderRadius.circular(16),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const StockAddView())),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Aucun rappel prévu',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: Colors.black54),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Ajouter un médicament',
+                          style: Theme.of(context).textTheme.bodyLarge,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.add,
+                      color: AppTheme.primaryPink,
+                      size: 22,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    final now = DateTime.now();
+    final countdown = reminder.countdownFrom(now);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      child: Material(
+        color: AppTheme.softPink,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => ReminderTimelineView(
+                initialDay: reminder.scheduledAt.toLocal(),
+              ),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Prochain rappel',
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodySmall?.copyWith(color: Colors.black54),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              reminder.medicationName,
+                              style: Theme.of(context).textTheme.bodyLarge,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            reminder.timeLabel,
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(color: Colors.black54),
+                          ),
+                          if (countdown.isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppTheme.primaryPink.withValues(
+                                  alpha: 0.2,
+                                ),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                countdown,
+                                style: const TextStyle(
+                                  fontFamily: 'Montserrat',
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppTheme.primaryPink,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.notifications_outlined,
+                    color: AppTheme.primaryPink,
+                    size: 22,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

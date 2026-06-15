@@ -5,7 +5,39 @@ import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/appointment.dart';
+import '../models/intake_model.dart';
 import '../services/api_service.dart';
+
+class NextReminder {
+  const NextReminder({
+    required this.medicationName,
+    required this.scheduledAt,
+  });
+
+  final String medicationName;
+  final DateTime scheduledAt;
+
+  String get timeLabel {
+    final local = scheduledAt.toLocal();
+    final h = local.hour.toString().padLeft(2, '0');
+    final m = local.minute.toString().padLeft(2, '0');
+    return '$h:$m';
+  }
+
+  String countdownFrom(DateTime now) {
+    final diff = scheduledAt.difference(now).inMinutes;
+    if (diff <= 0) return '';
+    if (diff < 60) return 'Dans ${diff}min';
+    final totalH = diff ~/ 60;
+    if (totalH < 24) {
+      final m = diff % 60;
+      return m == 0 ? 'Dans ${totalH}h' : 'Dans ${totalH}h${m.toString().padLeft(2, '0')}';
+    }
+    final days = totalH ~/ 24;
+    if (days == 1) return 'Demain';
+    return 'Dans $days jours';
+  }
+}
 
 class HomeViewModel extends ChangeNotifier {
   static const _storageCodeKeyBase = 'caregiver_share_code';
@@ -17,6 +49,8 @@ class HomeViewModel extends ChangeNotifier {
   String shareCode = '------';
   bool isGeneratingCode = false;
   List<Appointment> appointments = const [];
+  NextReminder? nextReminder;
+  bool isLoadingReminder = true;
   Timer? _refreshCodeTimer;
   static const Duration _codeRefreshInterval = Duration(hours: 8);
 
@@ -33,7 +67,11 @@ class HomeViewModel extends ChangeNotifier {
     _startAutoRefreshCode();
     await loadUser();
     await _loadCachedCode();
-    await Future.wait([ensureFreshShareCode(), loadAppointments()]);
+    await Future.wait([
+      ensureFreshShareCode(),
+      loadAppointments(),
+      loadNextReminder(),
+    ]);
   }
 
   Future<void> _loadCachedCode() async {
@@ -89,6 +127,54 @@ class HomeViewModel extends ChangeNotifier {
       appointments = await ApiService.getAppointments();
       notifyListeners();
     } catch (_) {}
+  }
+
+  Future<void> loadNextReminder() async {
+    isLoadingReminder = true;
+    notifyListeners();
+    try {
+      final now = DateTime.now();
+
+      final treatments = await ApiService.getTreatments();
+      debugPrint('[Home] ${treatments.length} traitement(s) chargé(s)');
+
+      final intakeLists = await Future.wait(
+        treatments.map((t) async {
+          try {
+            final list = await ApiService.getIntakesForTreatment(t.id);
+            debugPrint('[Home] traitement ${t.id} → ${list.length} intake(s)');
+            return list;
+          } catch (e) {
+            debugPrint('[Home] ERREUR traitement ${t.id}: $e');
+            return <IntakeItem>[];
+          }
+        }),
+      );
+
+      IntakeItem? best;
+      for (final list in intakeLists) {
+        for (final intake in list) {
+          if (!intake.isPending) continue;
+          if (intake.scheduledAt.isBefore(now)) continue;
+          if (best == null || intake.scheduledAt.isBefore(best.scheduledAt)) {
+            best = intake;
+          }
+        }
+      }
+      debugPrint('[Home] nextReminder: ${best?.id} (${best?.medicationName}) @ ${best?.scheduledAt}');
+      nextReminder = best == null
+          ? null
+          : NextReminder(
+              medicationName: best.medicationName,
+              scheduledAt: best.scheduledAt,
+            );
+    } catch (e) {
+      debugPrint('[Home] ERREUR loadNextReminder: $e');
+      nextReminder = null;
+    } finally {
+      isLoadingReminder = false;
+      notifyListeners();
+    }
   }
 
   List<Appointment> appointmentsForDay(DateTime day) {

@@ -14,12 +14,14 @@ class ProfileView extends StatefulWidget {
   const ProfileView({
     super.key,
     required this.onLogout,
+    required this.onChangeRole,
     this.isCaregiver = false,
     this.caregiverHub,
     this.onRequestAddProfile,
   });
 
   final VoidCallback onLogout;
+  final VoidCallback onChangeRole;
   final bool isCaregiver;
   final CaregiverHubViewModel? caregiverHub;
   final VoidCallback? onRequestAddProfile;
@@ -50,6 +52,7 @@ class _ProfileViewState extends State<ProfileView> {
     super.dispose();
   }
 
+  // Charge les aidants autorisés à suivre ce patient pour afficher leurs permissions.
   Future<void> _loadMyCaregivers() async {
     setState(() {
       _isLoadingCaregivers = true;
@@ -446,6 +449,7 @@ class _ProfileViewState extends State<ProfileView> {
     }
   }
 
+  // Affiche les permissions que le patient donne à chacun de ses aidants.
   Widget _buildMyCaregiversSection(BuildContext context) {
     if (_isLoadingCaregivers) {
       return const Center(
@@ -858,7 +862,18 @@ class _ProfileViewState extends State<ProfileView> {
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton(
-                        onPressed: widget.onLogout,
+                        onPressed: widget.onChangeRole,
+                        child: const Text('Changer de rôle'),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: () async {
+                          await ApiService.logout();
+                          widget.onLogout();
+                        },
                         child: const Text('Deconnexion'),
                       ),
                     ),

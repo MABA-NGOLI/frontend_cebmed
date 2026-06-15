@@ -36,7 +36,7 @@ class CaregiverLinkViewModel extends ChangeNotifier {
       return true;
     } catch (e) {
       final raw = _cleanErrorMessage(e).trim();
-      errorMessage = raw.isEmpty ? 'Code invalide ou expirÃ©' : raw;
+      errorMessage = raw.isEmpty ? 'Code invalide ou expiré' : raw;
       return false;
     } finally {
       isLoading = false;

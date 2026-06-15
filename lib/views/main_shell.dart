@@ -11,12 +11,14 @@ class MainShell extends StatefulWidget {
   const MainShell({
     super.key,
     required this.onLogout,
+    required this.onChangeRole,
     this.isCaregiver = false,
     this.openCaregiverSetupOnStart = false,
     this.onCancelCaregiverSetup,
   });
 
   final VoidCallback onLogout;
+  final VoidCallback onChangeRole;
   final bool isCaregiver;
   final bool openCaregiverSetupOnStart;
   final VoidCallback? onCancelCaregiverSetup;
@@ -41,6 +43,7 @@ class _MainShellState extends State<MainShell> {
     }
   }
 
+  // Prépare le mode aidant : charge les patients liés et ouvre l'ajout si aucun profil n'existe.
   Future<void> _initializeCaregiverMode() async {
     await _caregiverHub.initialize();
     if (!mounted || _didPromptMissingCaregiverProfile) return;
@@ -108,6 +111,7 @@ class _MainShellState extends State<MainShell> {
     final canEditAgenda =
         !widget.isCaregiver || activeProfile?.canEditAgenda == true;
 
+    // Les onglets sont construits selon les permissions du patient actif.
     final tabs = <_ShellTab>[
       _ShellTab(
         page: HomeView(
@@ -160,6 +164,7 @@ class _MainShellState extends State<MainShell> {
       _ShellTab(
         page: ProfileView(
           onLogout: widget.onLogout,
+          onChangeRole: widget.onChangeRole,
           isCaregiver: widget.isCaregiver,
           caregiverHub: widget.isCaregiver ? _caregiverHub : null,
           onRequestAddProfile: widget.isCaregiver ? _openAddProfile : null,

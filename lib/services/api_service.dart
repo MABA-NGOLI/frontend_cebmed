@@ -1,17 +1,18 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'caregiver_mode_service.dart';
-
 import '../models/appointment.dart';
 import '../models/auth_models.dart';
 import '../models/caregiver_profile_model.dart';
 import '../models/document_model.dart';
+import '../models/intake_model.dart';
 import '../models/stock_model.dart';
 import '../models/treatment_model.dart';
+import 'caregiver_mode_service.dart';
 
 class ApiService {
   static final String baseUrl = _resolveBaseUrl();
@@ -32,20 +33,14 @@ class ApiService {
   static String? _accessToken;
   static String? _refreshToken;
 
+  // Appelé quand la session expire pour laisser l'UI renvoyer vers la connexion.
+  static VoidCallback? onSessionExpired;
+
+  // Évite de lancer plusieurs refresh token en même temps.
+  static Completer<void>? _refreshCompleter;
+
   static const String _kAccessToken = 'auth_access_token';
   static const String _kRefreshToken = 'auth_refresh_token';
-
-  static Future<Map<String, String>> careHeaders() async {
-    final values = Map<String, String>.from(headers());
-    final isCaregiver = await CaregiverModeService.isCaregiver();
-    if (!isCaregiver) return values;
-
-    final patientId = await CaregiverModeService.getActivePatientId();
-    if (patientId != null) {
-      values['x-patient-id'] = patientId.toString();
-    }
-    return values;
-  }
 
   static Future<void> _saveTokens() async {
     if (_accessToken == null || _refreshToken == null) return;
@@ -76,7 +71,20 @@ class ApiService {
     };
   }
 
-  // Exécute une requète et relance automatiquement après refresh si 401.
+  // Ajoute le patient actif quand l'utilisateur navigue en mode aidant.
+  static Future<Map<String, String>> careHeaders() async {
+    final values = Map<String, String>.from(headers());
+    final isCaregiver = await CaregiverModeService.isCaregiver();
+    if (!isCaregiver) return values;
+
+    final patientId = await CaregiverModeService.getActivePatientId();
+    if (patientId != null) {
+      values['x-patient-id'] = patientId.toString();
+    }
+    return values;
+  }
+
+  // Exécute une requête et relance automatiquement après refresh si 401.
   static Future<http.Response> _execute(
     Future<http.Response> Function() call,
   ) async {
@@ -89,26 +97,79 @@ class ApiService {
     return response;
   }
 
+  // Décode les réponses HTTP en UTF-8 pour éviter les accents cassés côté Flutter.
+  static dynamic _decodeJson(http.Response response) {
+    return jsonDecode(utf8.decode(response.bodyBytes));
+  }
+
   static Future<void> refresh() async {
-    if (_refreshToken == null)
-      throw Exception('Session expirée, veuillez vous reconnecter');
+    // Si un refresh est déjà en cours, on attend le même résultat.
+    if (_refreshCompleter != null) {
+      await _refreshCompleter!.future;
+      return;
+    }
 
-    final response = await http.post(
-      Uri.parse('$baseUrl/refresh'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'refresh_token': _refreshToken}),
-    );
-
-    if (response.statusCode != 200) {
-      _accessToken = null;
-      _refreshToken = null;
+    if (_refreshToken == null) {
+      onSessionExpired?.call();
       throw Exception('Session expirée, veuillez vous reconnecter');
     }
 
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
-    _accessToken = data['access_token'] as String?;
-    _refreshToken = data['refresh_token'] as String?;
-    await _saveTokens();
+    final completer = Completer<void>();
+    _refreshCompleter = completer;
+
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/refresh'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'refresh_token': _refreshToken}),
+      );
+
+      if (response.statusCode != 200) {
+        await clearTokensPersisted();
+        onSessionExpired?.call();
+        final error = Exception('Session expirée, veuillez vous reconnecter');
+        completer.completeError(error);
+        throw error;
+      }
+
+      final data = _decodeJson(response) as Map<String, dynamic>;
+      _accessToken = data['access_token'] as String?;
+      _refreshToken = data['refresh_token'] as String?;
+      await _saveTokens();
+      completer.complete();
+    } catch (e) {
+      if (!completer.isCompleted) completer.completeError(e);
+      rethrow;
+    } finally {
+      _refreshCompleter = null;
+    }
+  }
+
+  // Vérifie si l'access token est expiré ou proche de l'expiration.
+  static bool _isAccessTokenExpiredOrExpiringSoon() {
+    if (_accessToken == null) return true;
+    try {
+      final parts = _accessToken!.split('.');
+      if (parts.length != 3) return true;
+      final padding = '=' * ((4 - parts[1].length % 4) % 4);
+      final payload = utf8.decode(base64Url.decode(parts[1] + padding));
+      final data = jsonDecode(payload) as Map<String, dynamic>;
+      final exp = data['exp'] as int?;
+      if (exp == null) return true;
+      final expiry = DateTime.fromMillisecondsSinceEpoch(exp * 1000);
+      return DateTime.now().isAfter(
+        expiry.subtract(const Duration(minutes: 2)),
+      );
+    } catch (_) {
+      return true;
+    }
+  }
+
+  // À appeler au retour au premier plan pour garder une session valide.
+  static Future<void> refreshIfNeeded() async {
+    if (_isAccessTokenExpiredOrExpiringSoon()) {
+      await refresh();
+    }
   }
 
   static void clearTokens() {
@@ -120,6 +181,15 @@ class ApiService {
     });
   }
 
+  static Future<void> clearTokensPersisted() async {
+    _accessToken = null;
+    _refreshToken = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_kAccessToken);
+    await prefs.remove(_kRefreshToken);
+  }
+
+  // Authentification: création de compte, connexion et récupération du profil.
   static Future<Map<String, dynamic>> register({
     required String firstName,
     required String lastName,
@@ -139,7 +209,7 @@ class ApiService {
       }),
     );
 
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final data = _decodeJson(response) as Map<String, dynamic>;
 
     if (response.statusCode != 201 && response.statusCode != 200) {
       throw Exception((data['message'] ?? 'Inscription impossible').toString());
@@ -159,7 +229,7 @@ class ApiService {
       body: jsonEncode({'email': email, 'password': password}),
     );
 
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final data = _decodeJson(response) as Map<String, dynamic>;
 
     if (response.statusCode != 200) {
       throw Exception(
@@ -182,18 +252,22 @@ class ApiService {
   static Future<void> requestPasswordReset({required String email}) async {
     final response = await http.post(
       Uri.parse('$baseUrl/auth/password/forgot'),
-      headers: headers(),
+      headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'email': email}),
     );
 
     if (response.statusCode != 200) {
-      String message = 'Demande de rénitialisation impossible';
+      String message = 'Demande de réinitialisation impossible';
       try {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final data = _decodeJson(response) as Map<String, dynamic>;
         message = (data['message'] ?? message).toString();
       } catch (_) {}
       throw Exception(message);
     }
+  }
+
+  static Future<void> forgotPassword(String email) async {
+    await requestPasswordReset(email: email);
   }
 
   static Future<void> resetPassword({
@@ -203,7 +277,7 @@ class ApiService {
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/auth/password/reset'),
-      headers: headers(),
+      headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'email': email,
         'code': code,
@@ -214,10 +288,41 @@ class ApiService {
     if (response.statusCode != 200) {
       String message = 'Réinitialisation impossible';
       try {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final data = _decodeJson(response) as Map<String, dynamic>;
         message = (data['message'] ?? message).toString();
       } catch (_) {}
       throw Exception(message);
+    }
+  }
+
+  static Future<void> verifyEmail({
+    required String email,
+    required String code,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/verify-email'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email, 'code': code}),
+    );
+
+    if (response.statusCode != 200) {
+      final data = _decodeJson(response) as Map<String, dynamic>;
+      throw Exception((data['message'] ?? 'Code invalide').toString());
+    }
+  }
+
+  static Future<void> resendVerificationEmail(String email) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/resend-verification'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email}),
+    );
+
+    if (response.statusCode != 200) {
+      final data = _decodeJson(response) as Map<String, dynamic>;
+      throw Exception(
+        (data['message'] ?? 'Erreur lors de l\'envoi').toString(),
+      );
     }
   }
 
@@ -232,7 +337,7 @@ class ApiService {
       );
     }
 
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final body = _decodeJson(response) as Map<String, dynamic>;
     if (body['user'] is Map<String, dynamic>) {
       return MeResponse.fromJson(body);
     }
@@ -262,7 +367,7 @@ class ApiService {
       );
     }
 
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final body = _decodeJson(response) as Map<String, dynamic>;
     if (body['user'] is Map<String, dynamic>) {
       return MeResponse.fromJson(body);
     }
@@ -285,6 +390,7 @@ class ApiService {
     clearTokens();
   }
 
+  // Aidants: création d'un code que le patient partage à son aidant.
   static Future<String> createCaregiverInviteCode() async {
     final response = await _execute(
       () => http.post(
@@ -299,7 +405,7 @@ class ApiService {
       );
     }
 
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final body = _decodeJson(response) as Map<String, dynamic>;
 
     final dynamic data = body['data'];
     final dynamic invite = body['invite'];
@@ -320,6 +426,7 @@ class ApiService {
     return code.trim();
   }
 
+  // Valide le code patient saisi par un aidant et crée la relation côté backend.
   static Future<void> redeemCaregiverInvite(String code) async {
     final normalized = code.trim().toUpperCase();
     if (normalized.isEmpty) {
@@ -337,7 +444,7 @@ class ApiService {
     if (response.statusCode != 200 && response.statusCode != 201) {
       String message = 'Code invalide ou expiré';
       try {
-        final body = jsonDecode(response.body) as Map<String, dynamic>;
+        final body = _decodeJson(response) as Map<String, dynamic>;
         final raw = body['message']?.toString();
         if (raw != null && raw.trim().isNotEmpty) {
           message = raw.trim();
@@ -361,25 +468,11 @@ class ApiService {
       );
     }
 
-    final decoded = jsonDecode(response.body);
-    List<dynamic> rows = const [];
+    final body = _decodeJson(response) as Map<String, dynamic>;
+    final dynamic raw = body['relations'] ?? body['data'] ?? body['invites'];
+    if (raw is! List) return const [];
 
-    if (decoded is List) {
-      rows = decoded;
-    } else if (decoded is Map<String, dynamic>) {
-      final data = decoded['data'];
-      final relations = decoded['relations'];
-      final invites = decoded['invites'];
-      if (relations is List) {
-        rows = relations;
-      } else if (data is List) {
-        rows = data;
-      } else if (invites is List) {
-        rows = invites;
-      }
-    }
-
-    return rows
+    return raw
         .whereType<Map<String, dynamic>>()
         .map(CaregiverProfileModel.fromJson)
         .toList();
@@ -399,21 +492,39 @@ class ApiService {
       );
     }
 
-    final decoded = jsonDecode(response.body);
-    List<dynamic> rows = const [];
-    if (decoded is Map<String, dynamic> && decoded['caregivers'] is List) {
-      rows = decoded['caregivers'] as List<dynamic>;
+    final body = _decodeJson(response) as Map<String, dynamic>;
+
+    // Attention: `created` correspond aux invitations/code de partage créés,
+    // pas aux aidants liés. Les utiliser ici crée des cartes vides "Profil".
+    final dynamic raw =
+        body['caregivers'] ??
+        body['patient_caregivers'] ??
+        body['myCaregivers'];
+    if (raw is! List) return const [];
+
+    final seen = <String>{};
+    final caregivers = <CaregiverProfileModel>[];
+
+    for (final item in raw.whereType<Map<String, dynamic>>()) {
+      final caregiver = CaregiverProfileModel.fromJson(item);
+      final hasName =
+          caregiver.firstName.trim().isNotEmpty ||
+          caregiver.lastName.trim().isNotEmpty;
+      if (!hasName) continue;
+
+      final key =
+          '${caregiver.relationId ?? ''}:${caregiver.patientId ?? ''}:${caregiver.fullName}';
+      if (seen.add(key)) {
+        caregivers.add(caregiver);
+      }
     }
 
-    return rows
-        .whereType<Map<String, dynamic>>()
-        .map(CaregiverProfileModel.fromJson)
-        .toList();
+    return caregivers;
   }
 
   static Future<void> deleteCaregiverRelation(int relationId) async {
     final response = await _execute(
-      () => http.delete(
+      () async => http.delete(
         Uri.parse('$baseUrl/caregiver-invites/relations/$relationId'),
         headers: headers(),
       ),
@@ -433,30 +544,36 @@ class ApiService {
     bool? canViewDocuments,
     bool? canUploadDocuments,
   }) async {
+    final body = <String, dynamic>{
+      if (canViewAgenda != null) 'can_view_agenda': canViewAgenda,
+      if (canEditAgenda != null) 'can_edit_agenda': canEditAgenda,
+      if (canViewDocuments != null) 'can_view_documents': canViewDocuments,
+      if (canUploadDocuments != null)
+        'can_upload_documents': canUploadDocuments,
+    };
+
     final response = await _execute(
       () => http.patch(
         Uri.parse('$baseUrl/caregiver-invites/permissions/$relationId'),
         headers: headers(),
-        body: jsonEncode({
-          if (canViewAgenda != null) 'can_view_agenda': canViewAgenda,
-          if (canEditAgenda != null) 'can_edit_agenda': canEditAgenda,
-          if (canViewDocuments != null) 'can_view_documents': canViewDocuments,
-          if (canUploadDocuments != null)
-            'can_upload_documents': canUploadDocuments,
-        }),
+        body: jsonEncode(body),
       ),
     );
 
     if (response.statusCode != 200) {
       throw Exception(
-        'Erreur mise Ã  jour permissions (HTTP ${response.statusCode}): ${response.body}',
+        'Erreur mise à jour permissions aidant (HTTP ${response.statusCode}): ${response.body}',
       );
     }
   }
 
+  // Agenda: opérations CRUD sur les rendez-vous médicaux.
   static Future<List<Appointment>> getAppointments() async {
     final response = await _execute(
-      () => http.get(Uri.parse('$baseUrl/appointments'), headers: headers()),
+      () async => http.get(
+        Uri.parse('$baseUrl/appointments'),
+        headers: await careHeaders(),
+      ),
     );
 
     if (response.statusCode != 200) {
@@ -465,7 +582,7 @@ class ApiService {
       );
     }
 
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final body = _decodeJson(response) as Map<String, dynamic>;
     final List<dynamic> data = body['data'] as List<dynamic>;
 
     return data
@@ -503,20 +620,18 @@ class ApiService {
 
     if (response.statusCode != 201) {
       throw Exception(
-        'Erreur crÃ©ation rendez-vous (HTTP ${response.statusCode}): ${response.body}',
+        'Erreur création rendez-vous (HTTP ${response.statusCode}): ${response.body}',
       );
     }
 
-    return Appointment.fromJson(
-      jsonDecode(response.body) as Map<String, dynamic>,
-    );
+    return Appointment.fromJson(_decodeJson(response) as Map<String, dynamic>);
   }
 
   static Future<void> deleteAppointment(int id) async {
     final response = await _execute(
-      () => http.delete(
+      () async => http.delete(
         Uri.parse('$baseUrl/appointments/$id'),
-        headers: headers(),
+        headers: await careHeaders(),
       ),
     );
 
@@ -539,9 +654,9 @@ class ApiService {
     int? reminderDelay,
   }) async {
     final response = await _execute(
-      () => http.put(
+      () async => http.put(
         Uri.parse('$baseUrl/appointments/$id'),
-        headers: headers(),
+        headers: await careHeaders(),
         body: jsonEncode({
           if (title != null) 'title': title,
           if (description != null) 'description': description,
@@ -563,14 +678,16 @@ class ApiService {
       );
     }
 
-    return Appointment.fromJson(
-      jsonDecode(response.body) as Map<String, dynamic>,
-    );
+    return Appointment.fromJson(_decodeJson(response) as Map<String, dynamic>);
   }
 
+  // Documents: stockage, consultation, téléchargement et QR de partage.
   static Future<List<DocumentModel>> getDocuments() async {
     final response = await _execute(
-      () => http.get(Uri.parse('$baseUrl/documents'), headers: headers()),
+      () async => http.get(
+        Uri.parse('$baseUrl/documents'),
+        headers: await careHeaders(),
+      ),
     );
 
     if (response.statusCode != 200) {
@@ -579,7 +696,7 @@ class ApiService {
       );
     }
 
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final body = _decodeJson(response) as Map<String, dynamic>;
     final List<dynamic> data = body['data'] as List<dynamic>;
 
     return data
@@ -595,9 +712,9 @@ class ApiService {
     required List<int> bytes,
   }) async {
     final response = await _execute(
-      () => http.post(
+      () async => http.post(
         Uri.parse('$baseUrl/documents'),
-        headers: headers(),
+        headers: await careHeaders(),
         body: jsonEncode({
           'name': name,
           'type': type,
@@ -610,12 +727,12 @@ class ApiService {
 
     if (response.statusCode != 201) {
       throw Exception(
-        'Erreur crÃ©ation document (HTTP ${response.statusCode}): ${response.body}',
+        'Erreur création document (HTTP ${response.statusCode}): ${response.body}',
       );
     }
 
     return DocumentModel.fromJson(
-      jsonDecode(response.body) as Map<String, dynamic>,
+      _decodeJson(response) as Map<String, dynamic>,
     );
   }
 
@@ -628,9 +745,9 @@ class ApiService {
     List<int>? bytes,
   }) async {
     final response = await _execute(
-      () => http.put(
+      () async => http.put(
         Uri.parse('$baseUrl/documents/$id'),
-        headers: headers(),
+        headers: await careHeaders(),
         body: jsonEncode({
           if (name != null) 'name': name,
           if (type != null) 'type': type,
@@ -648,14 +765,16 @@ class ApiService {
     }
 
     return DocumentModel.fromJson(
-      jsonDecode(response.body) as Map<String, dynamic>,
+      _decodeJson(response) as Map<String, dynamic>,
     );
   }
 
   static Future<void> deleteDocument(int id) async {
     final response = await _execute(
-      () =>
-          http.delete(Uri.parse('$baseUrl/documents/$id'), headers: headers()),
+      () async => http.delete(
+        Uri.parse('$baseUrl/documents/$id'),
+        headers: await careHeaders(),
+      ),
     );
 
     if (response.statusCode != 204) {
@@ -665,11 +784,12 @@ class ApiService {
     }
   }
 
+  // Demande au backend une URL temporaire qui sera encodée dans le QR code.
   static Future<String> createDocumentShareLink(int id) async {
     final response = await _execute(
-      () => http.post(
+      () async => http.post(
         Uri.parse('$baseUrl/documents/$id/share-link'),
-        headers: headers(),
+        headers: await careHeaders(),
       ),
     );
 
@@ -679,20 +799,24 @@ class ApiService {
       );
     }
 
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final body = _decodeJson(response) as Map<String, dynamic>;
     final link = (body['share_url'] ?? body['shareUrl'] ?? body['url'])
         ?.toString();
 
     if (link == null || link.trim().isEmpty) {
-      throw Exception('Lien de partage absent dans la rÃ©ponse backend');
+      throw Exception('Lien de partage absent dans la réponse backend');
     }
 
     return link.trim();
   }
 
+  // Stock et traitements: médicaments, inventaire, prises et rappels.
   static Future<void> deleteStock(int id) async {
     final response = await _execute(
-      () => http.delete(Uri.parse('$baseUrl/stock/$id'), headers: headers()),
+      () async => http.delete(
+        Uri.parse('$baseUrl/stock/$id'),
+        headers: await careHeaders(),
+      ),
     );
 
     if (response.statusCode != 204 && response.statusCode != 200) {
@@ -704,8 +828,10 @@ class ApiService {
 
   static Future<void> deleteTreatment(int id) async {
     final response = await _execute(
-      () =>
-          http.delete(Uri.parse('$baseUrl/treatment/$id'), headers: headers()),
+      () async => http.delete(
+        Uri.parse('$baseUrl/treatment/$id'),
+        headers: await careHeaders(),
+      ),
     );
 
     if (response.statusCode != 204 && response.statusCode != 200) {
@@ -717,9 +843,9 @@ class ApiService {
 
   static Future<void> addStock({required int id, required int amount}) async {
     final response = await _execute(
-      () => http.patch(
+      () async => http.patch(
         Uri.parse('$baseUrl/stock/$id/add'),
-        headers: headers(),
+        headers: await careHeaders(),
         body: jsonEncode({'amount': amount}),
       ),
     );
@@ -736,9 +862,9 @@ class ApiService {
     required int amount,
   }) async {
     final response = await _execute(
-      () => http.patch(
+      () async => http.patch(
         Uri.parse('$baseUrl/stock/$id/remove'),
-        headers: headers(),
+        headers: await careHeaders(),
         body: jsonEncode({'amount': amount}),
       ),
     );
@@ -756,9 +882,9 @@ class ApiService {
     String? location,
   }) async {
     final response = await _execute(
-      () => http.patch(
+      () async => http.patch(
         Uri.parse('$baseUrl/stock/$id'),
-        headers: headers(),
+        headers: await careHeaders(),
         body: jsonEncode({
           if (quantity != null) 'quantity': quantity,
           if (location != null) 'location': location,
@@ -768,7 +894,7 @@ class ApiService {
 
     if (response.statusCode != 200) {
       throw Exception(
-        'Erreur mise Ã  jour stock (HTTP ${response.statusCode}): ${response.body}',
+        'Erreur mise à jour stock (HTTP ${response.statusCode}): ${response.body}',
       );
     }
   }
@@ -779,15 +905,17 @@ class ApiService {
     final uri = Uri.parse(
       '$baseUrl/medication/nameSearch',
     ).replace(queryParameters: {'name': name});
-    final response = await _execute(() => http.get(uri, headers: headers()));
+    final response = await _execute(
+      () async => http.get(uri, headers: await careHeaders()),
+    );
 
     if (response.statusCode != 200) {
       throw Exception(
-        'Erreur recherche mÃ©dicament (HTTP ${response.statusCode}): ${response.body}',
+        'Erreur recherche médicament (HTTP ${response.statusCode}): ${response.body}',
       );
     }
 
-    final body = jsonDecode(response.body);
+    final body = _decodeJson(response);
     final List<dynamic> data;
     if (body is List) {
       data = body;
@@ -808,9 +936,9 @@ class ApiService {
     required String location,
   }) async {
     final response = await _execute(
-      () => http.post(
+      () async => http.post(
         Uri.parse('$baseUrl/stock/new'),
-        headers: headers(),
+        headers: await careHeaders(),
         body: jsonEncode({
           'medication_id': medicationId,
           'quantity': quantity,
@@ -821,7 +949,7 @@ class ApiService {
 
     if (response.statusCode != 201 && response.statusCode != 200) {
       throw Exception(
-        'Erreur crÃ©ation stock (HTTP ${response.statusCode}): ${response.body}',
+        'Erreur création stock (HTTP ${response.statusCode}): ${response.body}',
       );
     }
   }
@@ -834,9 +962,9 @@ class ApiService {
     String? endDate,
   }) async {
     final response = await _execute(
-      () => http.post(
+      () async => http.post(
         Uri.parse('$baseUrl/treatment/new'),
-        headers: headers(),
+        headers: await careHeaders(),
         body: jsonEncode({
           'medication_id': medicationId,
           'dosage': '0',
@@ -850,23 +978,26 @@ class ApiService {
 
     if (response.statusCode != 201 && response.statusCode != 200) {
       throw Exception(
-        'Erreur crÃ©ation traitement (HTTP ${response.statusCode}): ${response.body}',
+        'Erreur création traitement (HTTP ${response.statusCode}): ${response.body}',
       );
     }
 
-    final data = jsonDecode(response.body);
+    final data = _decodeJson(response);
     if (data is Map<String, dynamic>) {
       final id =
           data['id'] ??
           (data['data'] is Map ? (data['data'] as Map)['id'] : null);
       if (id != null) return (id as num).toInt();
     }
-    throw Exception('ID traitement introuvable dans la rÃ©ponse');
+    throw Exception('ID traitement introuvable dans la réponse');
   }
 
   static Future<List<TreatmentItem>> getTreatments() async {
     final response = await _execute(
-      () => http.get(Uri.parse('$baseUrl/treatment/me'), headers: headers()),
+      () async => http.get(
+        Uri.parse('$baseUrl/treatment/me'),
+        headers: await careHeaders(),
+      ),
     );
 
     if (response.statusCode != 200) {
@@ -875,7 +1006,7 @@ class ApiService {
       );
     }
 
-    final body = jsonDecode(response.body);
+    final body = _decodeJson(response);
     final List<dynamic> data;
     if (body is List) {
       data = body;
@@ -894,19 +1025,19 @@ class ApiService {
     int treatmentId,
   ) async {
     final response = await _execute(
-      () => http.get(
+      () async => http.get(
         Uri.parse('$baseUrl/treatment/$treatmentId/schedules'),
-        headers: headers(),
+        headers: await careHeaders(),
       ),
     );
 
     if (response.statusCode != 200) {
       throw Exception(
-        'Erreur chargement crÃ©neaux (HTTP ${response.statusCode}): ${response.body}',
+        'Erreur chargement créneaux (HTTP ${response.statusCode}): ${response.body}',
       );
     }
 
-    final body = jsonDecode(response.body);
+    final body = _decodeJson(response);
     final List<dynamic> data;
     if (body is List) {
       data = body;
@@ -927,23 +1058,26 @@ class ApiService {
     required double quantity,
   }) async {
     final response = await _execute(
-      () => http.post(
+      () async => http.post(
         Uri.parse('$baseUrl/treatment/$treatmentId/schedules'),
-        headers: headers(),
+        headers: await careHeaders(),
         body: jsonEncode({'time_of_day': timeOfDay, 'quantity': quantity}),
       ),
     );
 
     if (response.statusCode != 201 && response.statusCode != 200) {
       throw Exception(
-        'Erreur ajout crÃ©neau (HTTP ${response.statusCode}): ${response.body}',
+        'Erreur ajout créneau (HTTP ${response.statusCode}): ${response.body}',
       );
     }
   }
 
   static Future<StockSummary> getStock() async {
     final response = await _execute(
-      () => http.get(Uri.parse('$baseUrl/stock/me'), headers: headers()),
+      () async => http.get(
+        Uri.parse('$baseUrl/stock/me'),
+        headers: await careHeaders(),
+      ),
     );
 
     debugPrint('[Stock] status=${response.statusCode} body=${response.body}');
@@ -954,17 +1088,86 @@ class ApiService {
       );
     }
 
-    return StockSummary.fromJson(
-      jsonDecode(response.body) as Map<String, dynamic>,
-    );
+    return StockSummary.fromJson(_decodeJson(response) as Map<String, dynamic>);
   }
 
+  static Future<List<IntakeItem>> getIntakesForTreatment(
+    int treatmentId,
+  ) async {
+    final response = await _execute(
+      () async => http.get(
+        Uri.parse('$baseUrl/intake/treatment/$treatmentId'),
+        headers: await careHeaders(),
+      ),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Erreur chargement intakes (HTTP ${response.statusCode}): ${response.body}',
+      );
+    }
+
+    final body = _decodeJson(response);
+    debugPrint(
+      '[API] intake/$treatmentId body type=${body.runtimeType} preview=${response.body.substring(0, response.body.length.clamp(0, 120))}',
+    );
+
+    final List<dynamic> data;
+    if (body is List) {
+      data = body;
+    } else if (body is Map<String, dynamic>) {
+      final raw = body['data'] ?? body['intakes'] ?? body['items'] ?? const [];
+      data = raw is List ? raw : const [];
+    } else {
+      data = const [];
+    }
+
+    debugPrint('[API] intake/$treatmentId -> ${data.length} item(s) parses');
+
+    return data
+        .map((item) => IntakeItem.fromJson(item as Map<String, dynamic>))
+        .toList();
+  }
+
+  static Future<void> validateIntake(int intakeId) async {
+    final response = await _execute(
+      () async => http.patch(
+        Uri.parse('$baseUrl/intake/$intakeId/validate'),
+        headers: await careHeaders(),
+      ),
+    );
+
+    if (response.statusCode != 200 && response.statusCode != 204) {
+      throw Exception(
+        'Erreur validation intake (HTTP ${response.statusCode}): ${response.body}',
+      );
+    }
+  }
+
+  static Future<void> logout() async {
+    if (_refreshToken == null) {
+      clearTokens();
+      return;
+    }
+
+    try {
+      await http.post(
+        Uri.parse('$baseUrl/auth/logout'),
+        headers: headers(),
+        body: jsonEncode({'refresh_token': _refreshToken}),
+      );
+    } catch (_) {
+      // On efface les tokens localement même si le backend est inaccessible.
+    } finally {
+      clearTokens();
+    }
+  }
+
+  // Essaie plusieurs routes de téléchargement car le backend peut renvoyer un fichier brut ou du base64.
   static Future<List<int>> downloadDocument({
     required int id,
     String? fileUrl,
   }) async {
-    final requestHeaders = await careHeaders();
-
     final candidates = <Uri>[
       Uri.parse('$baseUrl/documents/$id/download'),
       Uri.parse('$baseUrl/documents/$id/file'),
@@ -975,7 +1178,7 @@ class ApiService {
 
     for (final uri in candidates) {
       try {
-        final response = await http.get(uri, headers: requestHeaders);
+        final response = await http.get(uri, headers: await careHeaders());
 
         if (response.statusCode != 200) {
           lastError = Exception('HTTP ${response.statusCode} on $uri');
@@ -984,7 +1187,7 @@ class ApiService {
 
         final contentType = response.headers['content-type'] ?? '';
         if (contentType.contains('application/json')) {
-          final json = jsonDecode(response.body) as Map<String, dynamic>;
+          final json = _decodeJson(response) as Map<String, dynamic>;
           final contentBase64 = json['contentBase64'] as String?;
           if (contentBase64 == null || contentBase64.isEmpty) {
             throw Exception('Réponse JSON sans contentBase64');
@@ -998,6 +1201,6 @@ class ApiService {
       }
     }
 
-    throw Exception('téléchargement document impossible: $lastError');
+    throw Exception('Téléchargement document impossible: $lastError');
   }
 }

@@ -5,7 +5,7 @@ import '../services/api_service.dart';
 import '../services/notification_service.dart';
 
 class AppointmentViewModel extends ChangeNotifier {
-  AppointmentViewModel({Appointment? initialAppointment})
+  AppointmentViewModel({Appointment? initialAppointment, this.syncNotifications = true})
       : _editingAppointmentId = initialAppointment?.id {
     if (initialAppointment == null) {
       selectedDate = DateTime.now();
@@ -35,6 +35,7 @@ class AppointmentViewModel extends ChangeNotifier {
   final TextEditingController locationController = TextEditingController();
   final TextEditingController descriptionController = TextEditingController();
   final int? _editingAppointmentId;
+  final bool syncNotifications;
 
   late DateTime selectedDate;
   late TimeOfDay selectedStartTime;
@@ -267,7 +268,11 @@ class AppointmentViewModel extends ChangeNotifier {
 
     try {
       await ApiService.deleteAppointment(_editingAppointmentId!);
-      await NotificationService.cancelAppointmentReminder(_editingAppointmentId!);
+      if (syncNotifications) {
+        await NotificationService.cancelAppointmentReminder(
+          _editingAppointmentId!,
+        );
+      }
       isSaving = false;
       notifyListeners();
       return true;
@@ -288,6 +293,7 @@ class AppointmentViewModel extends ChangeNotifier {
   }
 
   Future<void> _syncReminderForAppointment(Appointment appointment) async {
+    if (!syncNotifications) return;
     if (!appointment.notificationsEnabled) {
       await NotificationService.cancelAppointmentReminder(appointment.id);
       return;

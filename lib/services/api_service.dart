@@ -15,17 +15,18 @@ import '../models/treatment_model.dart';
 import 'caregiver_mode_service.dart';
 
 class ApiService {
+  // Client HTTP injectable pour pouvoir mocker les appels API dans les tests unitaires.
+  static http.Client httpClient = http.Client();
+
   static final String baseUrl = _resolveBaseUrl();
 
   static String _resolveBaseUrl() {
     // if (kIsWeb) {
     //   return 'http://localhost:3000/api';
     // }
-
     // if (defaultTargetPlatform == TargetPlatform.android) {
     //   return 'http://10.0.2.2:3000/api';
     // }
-
     // return 'http://localhost:3000/api';
     return 'http://31.207.35.91/cebmed/api';
   }
@@ -36,7 +37,7 @@ class ApiService {
   // Appelé quand la session expire pour laisser l'UI renvoyer vers la connexion.
   static VoidCallback? onSessionExpired;
 
-  // Évite de lancer plusieurs refresh token en même temps.
+  // évite de lancer plusieurs refresh token en même temps.
   static Completer<void>? _refreshCompleter;
 
   static const String _kAccessToken = 'auth_access_token';
@@ -84,7 +85,7 @@ class ApiService {
     return values;
   }
 
-  // Exécute une requête et relance automatiquement après refresh si 401.
+
   static Future<http.Response> _execute(
     Future<http.Response> Function() call,
   ) async {
@@ -97,13 +98,13 @@ class ApiService {
     return response;
   }
 
-  // Décode les réponses HTTP en UTF-8 pour éviter les accents cassés côté Flutter.
+
   static dynamic _decodeJson(http.Response response) {
     return jsonDecode(utf8.decode(response.bodyBytes));
   }
 
   static Future<void> refresh() async {
-    // Si un refresh est déjà en cours, on attend le même résultat.
+
     if (_refreshCompleter != null) {
       await _refreshCompleter!.future;
       return;
@@ -111,7 +112,7 @@ class ApiService {
 
     if (_refreshToken == null) {
       onSessionExpired?.call();
-      throw Exception('Session expirée, veuillez vous reconnecter');
+      throw Exception('Session expiré, veuillez vous reconnecter');
     }
 
     final completer = Completer<void>();
@@ -127,7 +128,7 @@ class ApiService {
       if (response.statusCode != 200) {
         await clearTokensPersisted();
         onSessionExpired?.call();
-        final error = Exception('Session expirée, veuillez vous reconnecter');
+        final error = Exception('Session expiré, veuillez vous reconnecter');
         completer.completeError(error);
         throw error;
       }
@@ -145,7 +146,7 @@ class ApiService {
     }
   }
 
-  // Vérifie si l'access token est expiré ou proche de l'expiration.
+
   static bool _isAccessTokenExpiredOrExpiringSoon() {
     if (_accessToken == null) return true;
     try {
@@ -165,7 +166,7 @@ class ApiService {
     }
   }
 
-  // À appeler au retour au premier plan pour garder une session valide.
+
   static Future<void> refreshIfNeeded() async {
     if (_isAccessTokenExpiredOrExpiringSoon()) {
       await refresh();
@@ -189,7 +190,7 @@ class ApiService {
     await prefs.remove(_kRefreshToken);
   }
 
-  // Authentification: création de compte, connexion et récupération du profil.
+
   static Future<Map<String, dynamic>> register({
     required String firstName,
     required String lastName,
@@ -390,7 +391,6 @@ class ApiService {
     clearTokens();
   }
 
-  // Aidants: création d'un code que le patient partage à son aidant.
   static Future<String> createCaregiverInviteCode() async {
     final response = await _execute(
       () => http.post(
@@ -420,13 +420,12 @@ class ApiService {
             ?.toString();
 
     if (code == null || code.trim().isEmpty) {
-      throw Exception('Code de partage absent dans la réponse backend');
+      throw Exception('Code de partage absent dans la rÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©ponse backend');
     }
 
     return code.trim();
   }
 
-  // Valide le code patient saisi par un aidant et crée la relation côté backend.
   static Future<void> redeemCaregiverInvite(String code) async {
     final normalized = code.trim().toUpperCase();
     if (normalized.isEmpty) {
@@ -494,8 +493,7 @@ class ApiService {
 
     final body = _decodeJson(response) as Map<String, dynamic>;
 
-    // Attention: `created` correspond aux invitations/code de partage créés,
-    // pas aux aidants liés. Les utiliser ici crée des cartes vides "Profil".
+
     final dynamic raw =
         body['caregivers'] ??
         body['patient_caregivers'] ??
@@ -567,10 +565,10 @@ class ApiService {
     }
   }
 
-  // Agenda: opérations CRUD sur les rendez-vous médicaux.
+
   static Future<List<Appointment>> getAppointments() async {
     final response = await _execute(
-      () async => http.get(
+      () async => httpClient.get(
         Uri.parse('$baseUrl/appointments'),
         headers: await careHeaders(),
       ),
@@ -601,7 +599,7 @@ class ApiService {
     int? reminderDelay,
   }) async {
     final response = await _execute(
-      () async => http.post(
+      () async => httpClient.post(
         Uri.parse('$baseUrl/appointments'),
         headers: await careHeaders(),
         body: jsonEncode({
@@ -629,7 +627,7 @@ class ApiService {
 
   static Future<void> deleteAppointment(int id) async {
     final response = await _execute(
-      () async => http.delete(
+      () async => httpClient.delete(
         Uri.parse('$baseUrl/appointments/$id'),
         headers: await careHeaders(),
       ),
@@ -727,7 +725,7 @@ class ApiService {
 
     if (response.statusCode != 201) {
       throw Exception(
-        'Erreur création document (HTTP ${response.statusCode}): ${response.body}',
+        'Erreur créaation document (HTTP ${response.statusCode}): ${response.body}',
       );
     }
 
@@ -784,7 +782,7 @@ class ApiService {
     }
   }
 
-  // Demande au backend une URL temporaire qui sera encodée dans le QR code.
+  // Demande au backend une URL temporaire qui sera encodé dans le QR code.
   static Future<String> createDocumentShareLink(int id) async {
     final response = await _execute(
       () async => http.post(
@@ -804,7 +802,7 @@ class ApiService {
         ?.toString();
 
     if (link == null || link.trim().isEmpty) {
-      throw Exception('Lien de partage absent dans la réponse backend');
+      throw Exception('Lien de partage absent dans la rÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©ponse backend');
     }
 
     return link.trim();
@@ -949,7 +947,7 @@ class ApiService {
 
     if (response.statusCode != 201 && response.statusCode != 200) {
       throw Exception(
-        'Erreur création stock (HTTP ${response.statusCode}): ${response.body}',
+        'Erreur création de stock (HTTP ${response.statusCode}): ${response.body}',
       );
     }
   }
